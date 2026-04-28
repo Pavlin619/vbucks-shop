@@ -40,24 +40,24 @@ testing of each story.
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T008 Define all shared TypeScript types in `types/index.ts`: `Profile`, `Purchase`, `SkinOrder`, `Skin`, `VBucksPack`, `OrderStatus` (see data-model.md for field definitions)
-- [ ] T009 [P] Create Supabase server client in `lib/supabase/server.ts` using anon key via `createServerClient` from `@supabase/ssr` — for server components and server actions (respects RLS)
-- [ ] T010 [P] Create Supabase admin client in `lib/supabase/admin.ts` using service role key via `createClient` — for API routes only; add lint comment warning never to import in components
-- [ ] T011 [P] Create Stripe SDK instance in `lib/stripe.ts` — export singleton `stripe` using `STRIPE_SECRET_KEY`
-- [ ] T012 [P] Create Resend SDK instance in `lib/resend.ts` — export singleton `resend` using `RESEND_API_KEY`
-- [ ] T013 [P] Define VBucks pack catalogue in `lib/vbucks-packs.ts`: four packs (200 / 500 / 1000 / 2800 V-Bucks) with `id`, `vbucks`, `price_cents`, `label` fields; export as `VBUCKS_PACKS` record and `getPackById` helper
-- [ ] T014 Write Supabase migration `supabase/migrations/20260417_init_profiles.sql`: `profiles` table with `id uuid PK`, `fortnite_username text nullable`, `vbucks_balance integer NOT NULL DEFAULT 0 CHECK (>= 0)`, `created_at`, `updated_at`; RLS enabled; policy: SELECT own row; `updated_at` trigger
+- [x] T008 Define all shared TypeScript types in `types/index.ts`: `Profile`, `Purchase`, `SkinOrder`, `Skin`, `VBucksPack`, `OrderStatus` (see data-model.md for field definitions)
+- [x] T009 [P] Create Supabase server client in `lib/supabase/server.ts` using anon key via `createServerClient` from `@supabase/ssr` — for server components and server actions (respects RLS)
+- [x] T010 [P] Create Supabase admin client in `lib/supabase/admin.ts` using service role key via `createClient` — for API routes only; add lint comment warning never to import in components
+- [x] T011 [P] Create Stripe SDK instance in `lib/stripe.ts` — export singleton `stripe` using `STRIPE_SECRET_KEY`
+- [x] T012 [P] Create Resend SDK instance in `lib/resend.ts` — export singleton `resend` using `RESEND_API_KEY`
+- [x] T013 [P] Define VBucks pack catalogue in `lib/vbucks-packs.ts`: four packs (200 / 500 / 1000 / 2800 V-Bucks) with `id`, `vbucks`, `price_cents`, `label` fields; export as `VBUCKS_PACKS` record and `getPackById` helper
+- [x] T014 Write Supabase migration `supabase/migrations/20260417_init_profiles.sql`: `profiles` table with `id uuid PK`, `fortnite_username text nullable`, `vbucks_balance integer NOT NULL DEFAULT 0 CHECK (>= 0)`, `created_at`, `updated_at`; RLS enabled; policy: SELECT own row; `updated_at` trigger
 - [ ] T014b Apply migrations to Supabase local/remote instance and verify schema
 - [ ] T014c Validate RLS policies manually using test queries
-- [ ] T015 [P] Write Supabase migration `supabase/migrations/20260417_init_purchases.sql`: `purchases` table with all columns from data-model.md; RLS enabled; SELECT own rows; no client INSERT/UPDATE/DELETE
-- [ ] T016 [P] Write Supabase migration `supabase/migrations/20260417_init_skin_orders.sql`: `skin_orders` table with all columns from data-model.md; status CHECK constraint `IN ('pending','gifted','refunded')`; RLS enabled; SELECT own rows; no client mutations
-- [ ] T017 Write Supabase migration `supabase/migrations/20260417_functions.sql`: `increment_vbucks(p_user_id uuid, p_amount integer)` and `buy_skin(p_user_id uuid, p_skin_id text, p_skin_name text, p_vbucks_cost integer) RETURNS uuid` — exact SQL in data-model.md
-- [ ] T018 Configure Clerk middleware in `app/middleware.ts`: protect all routes by default; public routes: `/`, `/sign-in(.*)`, `/sign-up(.*)`, `/api/webhooks/(.*)`
-- [ ] T019 [P] Create root layout in `app/layout.tsx` wrapping children in `<ClerkProvider>`; add `html`/`body` with Tailwind base classes
-- [ ] T020 [P] Create sign-in page at `app/(auth)/sign-in/[[...sign-in]]/page.tsx` using Clerk's `<SignIn>` component
-- [ ] T021 [P] Create sign-up page at `app/(auth)/sign-up/[[...sign-up]]/page.tsx` using Clerk's `<SignUp>` component
-- [ ] T022 Implement `POST /api/user/sync` in `app/api/user/sync/route.ts`: auth check via `auth()`, upsert `profiles` row using `supabaseAdmin` with `INSERT ... ON CONFLICT (id) DO NOTHING`
-- [ ] T023 [P] Unit test for `POST /api/user/sync` in `__tests__/unit/api/user-sync.test.ts`: 401 unauthenticated, 200 new user, 200 existing user (idempotent)
+- [x] T015 [P] Write Supabase migration `supabase/migrations/20260417_init_purchases.sql`: `purchases` table with all columns from data-model.md; RLS enabled; SELECT own rows; no client INSERT/UPDATE/DELETE
+- [x] T016 [P] Write Supabase migration `supabase/migrations/20260417_init_skin_orders.sql`: `skin_orders` table with all columns from data-model.md; status CHECK constraint `IN ('pending','gifted','refunded')`; RLS enabled; SELECT own rows; no client mutations
+- [x] T017 Write Supabase migration `supabase/migrations/20260417_functions.sql`: `increment_vbucks(p_user_id uuid, p_amount integer)` and `buy_skin(p_user_id uuid, p_skin_id text, p_skin_name text, p_vbucks_cost integer) RETURNS uuid` — exact SQL in data-model.md
+- [x] T018 Configure Clerk middleware in `app/middleware.ts`: protect all routes by default; public routes: `/`, `/sign-in(.*)`, `/sign-up(.*)`, `/api/webhooks/(.*)`
+- [x] T019 [P] Create root layout in `app/layout.tsx` wrapping children in `<ClerkProvider>`; add `html`/`body` with Tailwind base classes
+- [x] T020 [P] Create sign-in page at `app/(auth)/sign-in/[[...sign-in]]/page.tsx` using Clerk's `<SignIn>` component
+- [x] T021 [P] Create sign-up page at `app/(auth)/sign-up/[[...sign-up]]/page.tsx` using Clerk's `<SignUp>` component
+- [x] T022 Implement `POST /api/user/sync` in `app/api/user/sync/route.ts`: auth check via `auth()`, upsert `profiles` row using `supabaseAdmin` with `INSERT ... ON CONFLICT (id) DO NOTHING`
+- [x] T023 [P] Unit test for `POST /api/user/sync` in `__tests__/unit/api/user-sync.test.ts`: 401 unauthenticated, 200 new user, 200 existing user (idempotent)
 
 **Checkpoint**: Foundation complete — user story implementation can now begin
 
