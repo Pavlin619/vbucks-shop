@@ -41,4 +41,5 @@ export interface VBucksPack {
   vbucks: number;
   price_cents: number;
   label: string;
+  popular?: boolean;
 }
