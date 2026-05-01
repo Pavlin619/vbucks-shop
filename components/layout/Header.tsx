@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ShoppingCart, Zap, Menu, X } from 'lucide-react';
 import Link from 'next/link';
+import { ShoppingCart, Zap, Menu, X } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext';
 
 const NAV_LINKS = [
   { label: 'Fortnite', href: '#fortnite' },
@@ -14,6 +15,7 @@ const NAV_LINKS = [
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { totalItems } = useCart();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -50,13 +52,17 @@ export default function Header() {
 
         {/* Cart + mobile toggle */}
         <div className="flex items-center gap-3">
-          <button
-            className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors hover:bg-[#e62958]"
+          <Link
+            href="/cart"
+            data-testid="cart-link"
+            className="relative flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors hover:bg-[#e62958]"
             style={{ backgroundColor: '#ff3366', color: '#f6f7f8' }}
           >
             <ShoppingCart className="w-4 h-4" />
-            <span>Количка (0)</span>
-          </button>
+            <span>
+              Количка (<span data-testid="cart-count">{totalItems}</span>)
+            </span>
+          </Link>
 
           <button
             className="md:hidden p-2 rounded-lg transition-colors"

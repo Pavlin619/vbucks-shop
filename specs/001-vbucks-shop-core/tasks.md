@@ -76,22 +76,22 @@ any pack with Stripe test card `4242 4242 4242 4242`, return to app, and verify
 
 > **Write these tests FIRST and ensure they FAIL before implementation**
 
-- [ ] T024 [P] [US1] E2E test: full V-Bucks purchase flow in `__tests__/e2e/vbucks-purchase.spec.ts` — sign in, navigate to `/wallet`, click buy, complete Stripe test checkout, assert balance displays correct amount; use `data-testid="vbucks-balance"` and `data-testid="buy-pack-{packId}"`
-- [ ] T025 [P] [US1] Unit test for `POST /api/checkout` in `__tests__/unit/api/checkout.test.ts`: 401 unauthenticated, 400 invalid packId, 200 returns Stripe URL
-- [ ] T026 [P] [US1] Unit test for `POST /api/webhooks/stripe` in `__tests__/unit/api/webhook-stripe.test.ts`: 400 bad signature, 200 first event credits wallet, 200 duplicate event skipped (idempotent), 500 DB error retried
-- [ ] T027 [P] [US1] Unit test for `services/wallet.ts` in `__tests__/unit/services/wallet.test.ts`: `getProfile` returns profile, `setFortniteUsername` updates username
+- [x] T024 [P] [US1] E2E test: full V-Bucks purchase flow in `__tests__/e2e/vbucks-purchase.spec.ts` — sign in, navigate to `/wallet`, click buy, complete Stripe test checkout, assert balance displays correct amount; use `data-testid="vbucks-balance"` and `data-testid="buy-pack-{packId}"`
+- [x] T025 [P] [US1] Unit test for `POST /api/checkout` in `__tests__/unit/api/checkout.test.ts`: 401 unauthenticated, 400 invalid packId, 200 returns Stripe URL
+- [x] T026 [P] [US1] Unit test for `POST /api/webhooks/stripe` in `__tests__/unit/api/webhook-stripe.test.ts`: 400 bad signature, 200 first event credits wallet, 200 duplicate event skipped (idempotent), 500 DB error retried
+- [x] T027 [P] [US1] Unit test for `services/wallet.ts` in `__tests__/unit/services/wallet.test.ts`: `getProfile` returns profile, `setFortniteUsername` updates username
 
 ### Implementation for User Story 1
 
-- [ ] T028 [US1] Implement `services/wallet.ts`: `getProfile(userId: string): Promise<Profile>` using `supabaseAdmin`; `setFortniteUsername(userId: string, username: string): Promise<void>` — validate non-empty string, update `profiles.fortnite_username`
-- [ ] T029 [US1] Implement `POST /api/checkout` in `app/api/checkout/route.ts`: `auth()` check → validate `packId` via `getPackById` → create Stripe Checkout session with metadata `{ userId, vbucks, packId }`, `success_url`, `cancel_url` → return `{ url }`
-- [ ] T030 [US1] Implement `POST /api/webhooks/stripe` in `app/api/webhooks/stripe/route.ts`: verify signature with raw body → handle `checkout.session.completed` → attempt INSERT into `purchases` (catch unique violation for idempotency) → call `increment_vbucks` RPC → throw on DB error (Stripe retry)
-- [ ] T031 [P] [US1] Create `WalletBalance` server component in `components/wallet/WalletBalance.tsx`: accept `balance: number` prop; render with `data-testid="vbucks-balance"`
-- [ ] T032 [P] [US1] Create `BuyVBucksSection` server component in `components/wallet/BuyVBucksSection.tsx`: render pack grid from `VBUCKS_PACKS`; each pack button has `data-testid="buy-pack-{packId}"`; clicking POSTs to `/api/checkout` and redirects to Stripe URL
-- [ ] T033 [P] [US1] Create `FortniteUsernameForm` client component in `components/wallet/FortniteUsernameForm.tsx`: form with text input and submit; POSTs to Server Action wrapping `setFortniteUsername`; shows inline error/success; `data-testid="fortnite-username-input"` and `data-testid="fortnite-username-submit"`
-- [ ] T034 [P] [US1] Create checkout success page at `app/(shop)/checkout/success/page.tsx`: display success message and link back to `/wallet`
-- [ ] T035 [P] [US1] Create checkout cancel page at `app/(shop)/checkout/cancel/page.tsx`: display cancelled message and link back to `/wallet`
-- [ ] T036 [US1] Implement wallet page at `app/(shop)/wallet/page.tsx`: server component; fetch profile via `getProfile(userId)`; render `<WalletBalance>`, `<FortniteUsernameForm>`, `<BuyVBucksSection>`
+- [x] T028 [US1] Implement `services/wallet.ts`: `getProfile(userId: string): Promise<Profile>` using `supabaseAdmin`; `setFortniteUsername(userId: string, username: string): Promise<void>` — validate non-empty string, update `profiles.fortnite_username`
+- [x] T029 [US1] Implement `POST /api/checkout` in `app/api/checkout/route.ts`: `auth()` check → validate `packId` via `getPackById` → create Stripe Checkout session with metadata `{ userId, vbucks, packId }`, `success_url`, `cancel_url` → return `{ url }`
+- [x] T030 [US1] Implement `POST /api/webhooks/stripe` in `app/api/webhooks/stripe/route.ts`: verify signature with raw body → handle `checkout.session.completed` → attempt INSERT into `purchases` (catch unique violation for idempotency) → call `increment_vbucks` RPC → throw on DB error (Stripe retry)
+- [x] T031 [P] [US1] Create `WalletBalance` server component in `components/wallet/WalletBalance.tsx`: accept `balance: number` prop; render with `data-testid="vbucks-balance"`
+- [x] T032 [P] [US1] Create `BuyVBucksSection` server component in `components/wallet/BuyVBucksSection.tsx`: render pack grid from `VBUCKS_PACKS`; each pack button has `data-testid="buy-pack-{packId}"`; clicking POSTs to `/api/checkout` and redirects to Stripe URL
+- [x] T033 [P] [US1] Create `FortniteUsernameForm` client component in `components/wallet/FortniteUsernameForm.tsx`: form with text input and submit; POSTs to Server Action wrapping `setFortniteUsername`; shows inline error/success; `data-testid="fortnite-username-input"` and `data-testid="fortnite-username-submit"`
+- [x] T034 [P] [US1] Create checkout success page at `app/(shop)/checkout/success/page.tsx`: display success message and link back to `/wallet`
+- [x] T035 [P] [US1] Create checkout cancel page at `app/(shop)/checkout/cancel/page.tsx`: display cancelled message and link back to `/wallet`
+- [x] T036 [US1] Implement wallet page at `app/(shop)/wallet/page.tsx`: server component; fetch profile via `getProfile(userId)`; render `<WalletBalance>`, `<FortniteUsernameForm>`, `<BuyVBucksSection>`
 
 **Checkpoint**: User Story 1 independently functional — purchase flow works end-to-end
 
