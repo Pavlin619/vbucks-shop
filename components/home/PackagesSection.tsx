@@ -1,18 +1,21 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { ShoppingCart, X } from 'lucide-react';
+import { VBUCKS_PACKS, formatPrice } from '@/lib/vbucks-packs';
+import { useCart } from '@/contexts/CartContext';
 import type { VBucksPack } from '@/types';
 
-const VBUCKS_PACKS: VBucksPack[] = [
-  { id: '500', vbucks: 500, price_cents: 299, label: '500 V-Bucks' },
-  { id: '1000', vbucks: 1000, price_cents: 499, label: '1000 V-Bucks' },
-  { id: '1500', vbucks: 1500, price_cents: 699, label: '1500 V-Bucks', popular: true },
-  { id: '2800', vbucks: 2800, price_cents: 1149, label: '2800 V-Bucks' },
-  { id: '5000', vbucks: 5000, price_cents: 1799, label: '5000 V-Bucks' },
-];
-
-function formatPrice(cents: number): string {
-  return `€${(cents / 100).toFixed(2).replace('.', ',')}`;
-}
-
 export default function PackagesSection() {
+  const { addItem } = useCart();
+  const [addedPack, setAddedPack] = useState<VBucksPack | null>(null);
+
+  function handleBuy(pack: VBucksPack) {
+    addItem(pack.id);
+    setAddedPack(pack);
+  }
+
   return (
     <section id="packages" className="py-20 px-4" style={{ backgroundColor: '#011627' }}>
       <div className="max-w-7xl mx-auto">
@@ -24,7 +27,7 @@ export default function PackagesSection() {
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          {VBUCKS_PACKS.map((pack) => (
+          {Object.values(VBUCKS_PACKS).map((pack) => (
             <div
               key={pack.id}
               className="relative rounded-2xl p-8 border-2 transition-all hover:scale-105"
@@ -55,10 +58,13 @@ export default function PackagesSection() {
                 </div>
 
                 <button
+                  onClick={() => handleBuy(pack)}
+                  data-testid={`buy-pack-${pack.id}`}
                   className="w-full py-3 rounded-full font-semibold transition-colors hover:opacity-90"
                   style={{
                     backgroundColor: pack.popular ? '#ff3366' : '#011627',
                     color: '#f6f7f8',
+                    border: pack.popular ? 'none' : '1px solid rgba(246,247,248,0.2)',
                   }}
                 >
                   Купи Сега
@@ -68,6 +74,64 @@ export default function PackagesSection() {
           ))}
         </div>
       </div>
+
+      {/* Added-to-cart modal */}
+      {addedPack && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(1, 22, 39, 0.85)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setAddedPack(null)}
+          data-testid="added-to-cart-modal"
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-8 relative"
+            style={{ backgroundColor: '#36213e', border: '2px solid #ff3366' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setAddedPack(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Checkmark */}
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
+              style={{ backgroundColor: 'rgba(255, 51, 102, 0.15)', border: '2px solid #ff3366' }}
+            >
+              <ShoppingCart className="w-6 h-6" style={{ color: '#ff3366' }} />
+            </div>
+
+            <h3 className="text-xl font-bold text-center mb-1" style={{ color: '#f6f7f8' }}>
+              Добавено в количката!
+            </h3>
+            <p className="text-center text-gray-400 mb-6">
+              {addedPack.vbucks.toLocaleString()} V-Bucks &mdash; {formatPrice(addedPack.price_cents)}
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <Link
+                href="/cart"
+                data-testid="go-to-cart"
+                className="block text-center py-3 rounded-full font-semibold transition-colors hover:opacity-90"
+                style={{ backgroundColor: '#ff3366', color: '#f6f7f8' }}
+              >
+                Към количката
+              </Link>
+              <button
+                onClick={() => setAddedPack(null)}
+                data-testid="continue-shopping"
+                className="py-3 rounded-full font-semibold text-sm transition-colors hover:bg-white/10"
+                style={{ color: '#f6f7f8', border: '1px solid rgba(246,247,248,0.25)' }}
+              >
+                Продължи пазаруването
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

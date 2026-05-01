@@ -1,0 +1,11 @@
+import Header from '@/components/layout/Header';
+import CartContent from '@/components/cart/CartContent';
+
+export default function CartPage() {
+  return (
+    <>
+      <Header />
+      <CartContent />
+    </>
+  );
+}

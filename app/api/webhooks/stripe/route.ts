@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { syncProfile } from '@/services/wallet';
 
 // Must be disabled so Next.js gives us the raw body for signature verification.
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,6 @@ export async function POST(req: Request) {
     );
   } catch {
     console.error('[stripe webhook] signature verification failed');
-    
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -34,11 +34,11 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
-  const { userId, vbucks, packId } = session.metadata ?? {};
+  const { userId, vbucks } = session.metadata ?? {};
 
-  if (!userId || !vbucks || !packId) {
+  if (!userId || !vbucks) {
     console.error('[stripe webhook] missing metadata on session', session.id);
-    // Return 200 so Stripe doesn't retry — this is a data issue, not transient
+    // Return 200 — this is a data issue, retrying will not help.
     return NextResponse.json({ received: true });
   }
 
@@ -56,7 +56,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true });
   }
 
-  // Insert purchase row
+  // Ensure the profiles row exists before any FK/RPC calls
+  try {
+    await syncProfile(userId);
+  } catch (err) {
+    console.error('[stripe webhook] syncProfile failed', err);
+    return NextResponse.json({ error: 'DB error' }, { status: 500 });
+  }
+
+  // Insert purchase row (FK requires profile to exist)
   const { error: insertError } = await supabaseAdmin
     .from('purchases')
     .insert({
@@ -68,11 +76,10 @@ export async function POST(req: Request) {
 
   if (insertError) {
     console.error('[stripe webhook] insert purchase failed', insertError.message);
-    // Throw so Stripe retries
     return NextResponse.json({ error: 'DB error' }, { status: 500 });
   }
 
-  // Atomically credit VBucks balance
+  // Atomically credit V-Bucks balance
   const { error: rpcError } = await supabaseAdmin.rpc('increment_vbucks', {
     p_user_id: userId,
     p_amount: vbucksAmount,
