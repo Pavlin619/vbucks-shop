@@ -2,8 +2,7 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
-import { supabaseAdmin } from '@/lib/supabase/admin';
-import { syncProfile } from '@/services/wallet';
+import { creditPurchase } from '@/services/purchases';
 
 // Must be disabled so Next.js gives us the raw body for signature verification.
 export const dynamic = 'force-dynamic';
@@ -14,7 +13,10 @@ export async function POST(req: Request) {
   const sig = headersList.get('stripe-signature');
 
   if (!sig) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Missing stripe-signature header' },
+      { status: 400 },
+    );
   }
 
   let event: Stripe.Event;
@@ -34,59 +36,9 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
-  const { userId, vbucks } = session.metadata ?? {};
+  const result = await creditPurchase(session);
 
-  if (!userId || !vbucks) {
-    console.error('[stripe webhook] missing metadata on session', session.id);
-    // Return 200 — this is a data issue, retrying will not help.
-    return NextResponse.json({ received: true });
-  }
-
-  const vbucksAmount = parseInt(vbucks, 10);
-  const amountCents = session.amount_total ?? 0;
-
-  // Idempotency: skip if this session was already processed
-  const { data: existing } = await supabaseAdmin
-    .from('purchases')
-    .select('id')
-    .eq('stripe_session_id', session.id)
-    .maybeSingle();
-
-  if (existing) {
-    return NextResponse.json({ received: true });
-  }
-
-  // Ensure the profiles row exists before any FK/RPC calls
-  try {
-    await syncProfile(userId);
-  } catch (err) {
-    console.error('[stripe webhook] syncProfile failed', err);
-    return NextResponse.json({ error: 'DB error' }, { status: 500 });
-  }
-
-  // Insert purchase row (FK requires profile to exist)
-  const { error: insertError } = await supabaseAdmin
-    .from('purchases')
-    .insert({
-      user_id: userId,
-      stripe_session_id: session.id,
-      vbucks_amount: vbucksAmount,
-      amount_cents: amountCents,
-    });
-
-  if (insertError) {
-    console.error('[stripe webhook] insert purchase failed', insertError.message);
-    return NextResponse.json({ error: 'DB error' }, { status: 500 });
-  }
-
-  // Atomically credit V-Bucks balance
-  const { error: rpcError } = await supabaseAdmin.rpc('increment_vbucks', {
-    p_user_id: userId,
-    p_amount: vbucksAmount,
-  });
-
-  if (rpcError) {
-    console.error('[stripe webhook] increment_vbucks failed', rpcError.message);
+  if (!result.ok) {
     return NextResponse.json({ error: 'DB error' }, { status: 500 });
   }
 

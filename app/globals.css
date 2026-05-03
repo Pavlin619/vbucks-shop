@@ -3,13 +3,20 @@
 :root {
   --background: #011627;
   --foreground: #f6f7f8;
+
+  /* Brand palette — single source of truth for colors. Anything that ends up
+     in JSX should reference these via the `bg-brand-*` / `text-brand-*` /
+     `border-brand-*` utilities Tailwind generates from the @theme block
+     below, NOT as inline hex literals. */
   --brand-dark: #011627;
   --brand-purple: #36213e;
   --brand-accent: #ff3366;
   --brand-accent-hover: #e62958;
   --brand-text: #f6f7f8;
+  --brand-muted: #9ca3af;
+  --brand-overlay: rgba(1, 22, 39, 0.9);
   --brand-border: rgba(255, 51, 102, 0.2);
-  --brand-border-hover: rgba(255, 51, 102, 0.4);
+  --brand-border-strong: rgba(255, 51, 102, 0.45);
 }
 
 @theme inline {
@@ -17,11 +24,19 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Brand color tokens — generate utilities like `bg-brand-accent`,
+     `text-brand-muted`, `border-brand-border`. Adding a new brand color?
+     Add it here AND to :root above. */
   --color-brand-dark: var(--brand-dark);
   --color-brand-purple: var(--brand-purple);
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-hover: var(--brand-accent-hover);
   --color-brand-text: var(--brand-text);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-overlay: var(--brand-overlay);
+  --color-brand-border: var(--brand-border);
+  --color-brand-border-strong: var(--brand-border-strong);
 }
 
 body {

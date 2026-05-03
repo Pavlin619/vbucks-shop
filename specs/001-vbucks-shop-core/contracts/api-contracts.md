@@ -89,22 +89,26 @@ All routes return `{ error: string }` on failure with an appropriate HTTP status
 
 ## GET `/api/skins`
 
-**Purpose**: Proxy the Fortnite skin catalog from the external API, cached server-side.
+**Purpose**: Proxy the live Fortnite item shop (`/v2/shop`) from the external API,
+cached server-side.
 
 **Auth**: Required (Clerk session).
 
-**Query params**: none (returns full catalog)
+**Query params**: none (returns full live shop)
 
 **Success response** `200`:
 ```json
 {
-  "skins": [
+  "entries": [
     {
-      "id": "cid_xxx",
-      "name": "Renegade Raider",
+      "offerId": "v2:/664253e72bac6aa6df0d666893014d2a30e5f519ca2c5f2af5973f9222ef0d3f",
+      "name": "Ravenpool",
+      "description": "Maximum darkness.",
       "image_url": "https://...",
-      "rarity": "rare",
-      "vbucks_cost": 1200
+      "rarity": "marvel",
+      "vbucks_cost": 1500,
+      "regular_price": 1500,
+      "layout": "Deadpool Mashups"
     }
   ]
 }
@@ -116,6 +120,9 @@ All routes return `{ error: string }` on failure with an appropriate HTTP status
 
 **Notes**:
 - Response is cached via `unstable_cache` with a 1-hour revalidation period.
+- Free entries (`finalPrice <= 0`), jam tracks, instruments, cars and lego kits
+  are filtered out — only cosmetic offers (containing brItems and/or a bundle)
+  are returned.
 - External API credentials MUST NOT appear in the response.
 
 ---

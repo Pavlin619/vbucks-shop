@@ -222,12 +222,20 @@ export interface SkinOrder {
   resolved_at: string | null;
 }
 
-export interface Skin {
-  id: string;
+// NOTE (2026-05-01): The previous `Skin` shape was replaced with `ShopEntry`
+// once the catalog source switched from `/v2/cosmetics/br` (every cosmetic
+// ever, no prices) to `/v2/shop` (live item-shop entries with real prices).
+// The new shape mirrors what an offer in the Fortnite shop actually is:
+// either a single cosmetic or a bundle, always with a real V-Bucks price.
+export interface ShopEntry {
+  offerId: string;          // v2:/<hash> — snapshotted as skin_id at order time
   name: string;
+  description: string | null;
   image_url: string;
-  rarity: string;
-  vbucks_cost: number;
+  rarity: string;           // first brItem's rarity, or 'common' as a neutral fallback
+  vbucks_cost: number;      // = finalPrice from /v2/shop
+  regular_price: number;    // = regularPrice from /v2/shop (used for sale strikethrough)
+  layout: string | null;    // shop layout name (e.g. "Battle Ready", "Jam Tracks")
 }
 
 export interface VBucksPack {
