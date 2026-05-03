@@ -1,7 +1,9 @@
 'use client';
 
+import 'client-only';
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getPackById } from '@/lib/vbucks-packs';
+import { loadFromStorage, saveToStorage } from '@/contexts/_lib/cart-storage';
+import { computeCartTotals } from '@/contexts/_lib/cart-totals';
 
 export interface CartItem {
   packId: string;
@@ -20,18 +22,6 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-const STORAGE_KEY = 'vbucks-cart';
-
-function loadFromStorage(): CartItem[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
@@ -41,16 +31,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const persist = (next: CartItem[]) => {
     setItems(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    saveToStorage(next);
   };
 
   const addItem = useCallback((packId: string) => {
     setItems((prev) => {
       const existing = prev.find((i) => i.packId === packId);
       const next = existing
-        ? prev.map((i) => (i.packId === packId ? { ...i, quantity: i.quantity + 1 } : i))
+        ? prev.map((i) =>
+            i.packId === packId ? { ...i, quantity: i.quantity + 1 } : i,
+          )
         : [...prev, { packId, quantity: 1 }];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      saveToStorage(next);
       return next;
     });
   }, []);
@@ -58,7 +50,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const removeItem = useCallback((packId: string) => {
     setItems((prev) => {
       const next = prev.filter((i) => i.packId !== packId);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      saveToStorage(next);
       return next;
     });
   }, []);
@@ -67,20 +59,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     persist([]);
   }, []);
 
-  const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
-
-  const totalVbucks = items.reduce((sum, i) => {
-    const pack = getPackById(i.packId);
-    return sum + (pack?.vbucks ?? 0) * i.quantity;
-  }, 0);
-
-  const totalCents = items.reduce((sum, i) => {
-    const pack = getPackById(i.packId);
-    return sum + (pack?.price_cents ?? 0) * i.quantity;
-  }, 0);
+  const totals = computeCartTotals(items);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, clearCart, totalItems, totalVbucks, totalCents }}>
+    <CartContext.Provider
+      value={{
+        items,
+        addItem,
+        removeItem,
+        clearCart,
+        totalItems: totals.totalItems,
+        totalVbucks: totals.totalVbucks,
+        totalCents: totals.totalCents,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

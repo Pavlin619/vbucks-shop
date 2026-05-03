@@ -88,6 +88,19 @@ infrastructure. If the external source is down, the last cached response is serv
   and migration complexity for non-critical data.
 - No caching (direct proxy): fails on every catalog load when external API is down.
 
+### Update (2026-05-01) — switched from `/v2/cosmetics/br` to `/v2/shop`
+
+The original implementation hit `https://fortnite-api.com/v2/cosmetics/br`, which
+returns every cosmetic ever released with no V-Bucks price. We were inventing a
+rarity-to-price mapping in code, which violates the spirit of FR-010 ("display the
+V-Bucks cost"). We now hit `https://fortnite-api.com/v2/shop` instead, which returns
+the **live** item shop with the **real** `regularPrice` and `finalPrice` per offer.
+
+Trade-off: the catalog rotates daily and is much smaller. We consider this an
+improvement — orders are placed against an offer that is actually purchasable, and
+the displayed price is authoritative. Bundles, single-skin offers, and discounted
+items are all surfaced naturally without per-item logic.
+
 ---
 
 ## Decision 6: Atomic Order Creation — Balance Deduction + Order Insert

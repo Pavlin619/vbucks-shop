@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ShoppingCart, Zap, Menu, X } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
+import Button from '@/components/ui/Button';
 
 const NAV_LINKS = [
   { label: 'Fortnite', href: '#fortnite' },
-  { label: 'Item Shop', href: '#item-shop' },
+  { label: 'Item Shop', href: '/item-shop' },
   { label: 'Xbox', href: '#xbox' },
   { label: 'Roblox', href: '#roblox' },
   { label: 'Как Работи', href: '#how-it-works' },
@@ -19,54 +20,44 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
-      <div
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between"
-        style={{ backgroundColor: 'rgba(1, 22, 39, 0.9)', backdropFilter: 'blur(8px)' }}
-      >
-        {/* Logo */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between bg-brand-overlay backdrop-blur-md">
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: '#ff3366' }}
-          >
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-accent">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-lg hidden sm:block" style={{ color: '#f6f7f8' }}>
+          <span className="font-bold text-lg hidden sm:block text-brand-text">
             VBucks Shop
           </span>
         </Link>
 
-        {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-8">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="text-sm transition-colors hover:text-[#ff3366]"
-              style={{ color: '#f6f7f8' }}
+              className="text-sm text-brand-text transition-colors hover:text-brand-accent"
             >
               {link.label}
             </a>
           ))}
         </nav>
 
-        {/* Cart + mobile toggle */}
         <div className="flex items-center gap-3">
-          <Link
+          <Button
+            as="link"
             href="/cart"
+            size="sm"
             data-testid="cart-link"
-            className="relative flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors hover:bg-[#e62958]"
-            style={{ backgroundColor: '#ff3366', color: '#f6f7f8' }}
+            className="relative"
           >
             <ShoppingCart className="w-4 h-4" />
             <span>
               Количка (<span data-testid="cart-count">{totalItems}</span>)
             </span>
-          </Link>
+          </Button>
 
           <button
-            className="md:hidden p-2 rounded-lg transition-colors"
-            style={{ color: '#f6f7f8' }}
+            className="md:hidden p-2 rounded-lg text-brand-text transition-colors hover:bg-white/10"
             onClick={() => setMobileOpen((o) => !o)}
             aria-label="Toggle menu"
           >
@@ -75,18 +66,13 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {mobileOpen && (
-        <div
-          className="md:hidden px-4 pb-4 flex flex-col gap-3"
-          style={{ backgroundColor: 'rgba(1, 22, 39, 0.97)' }}
-        >
+        <div className="md:hidden px-4 pb-4 flex flex-col gap-3 bg-brand-overlay">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="py-2 text-sm transition-colors hover:text-[#ff3366]"
-              style={{ color: '#f6f7f8' }}
+              className="py-2 text-sm text-brand-text transition-colors hover:text-brand-accent"
               onClick={() => setMobileOpen(false)}
             >
               {link.label}
