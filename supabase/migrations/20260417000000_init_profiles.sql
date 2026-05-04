@@ -1,8 +1,8 @@
--- Migration: profiles table
--- Idempotent: uses IF NOT EXISTS throughout
+-- profiles table. NOTE: `id` is converted from uuid to text in
+-- 20260501_user_id_uuid_to_text.sql (Clerk userIds are not UUIDs).
 
 CREATE TABLE IF NOT EXISTS profiles (
-  id               uuid        PRIMARY KEY,  -- equals Clerk userId exactly
+  id               uuid        PRIMARY KEY,
   fortnite_username text        NULL,
   vbucks_balance   integer     NOT NULL DEFAULT 0 CHECK (vbucks_balance >= 0),
   created_at       timestamptz NOT NULL DEFAULT now(),

@@ -1,5 +1,5 @@
--- Migration: skin_orders table
--- Idempotent: uses IF NOT EXISTS throughout
+-- skin_orders table. NOTE: `user_id` is converted from uuid to text in
+-- 20260501_user_id_uuid_to_text.sql.
 
 CREATE TABLE IF NOT EXISTS skin_orders (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),

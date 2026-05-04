@@ -10,7 +10,6 @@ vi.mock('@/lib/stripe', () => ({
 
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: {
-    from: vi.fn(),
     rpc: vi.fn(),
   },
 }));
@@ -31,7 +30,6 @@ import { POST } from '@/app/api/webhooks/stripe/route';
 
 const mockConstructEvent = vi.mocked(stripe.webhooks.constructEvent);
 const mockHeaders = vi.mocked(headers);
-const mockFrom = vi.mocked(supabaseAdmin.from);
 const mockRpc = vi.mocked(supabaseAdmin.rpc);
 const mockSyncProfile = vi.mocked(syncProfile);
 
@@ -58,23 +56,11 @@ const makeRequest = (body = '{"test":true}', sig = VALID_SIG) => {
   });
 };
 
-const mockSuccessfulDb = () => {
-  mockFrom.mockReturnValue({
-    select: vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
-    }),
-    insert: vi.fn().mockResolvedValue({ error: null }),
-  } as never);
-  mockRpc.mockResolvedValue({ error: null } as never);
-  mockSyncProfile.mockResolvedValue(undefined);
-};
-
 describe('POST /api/webhooks/stripe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+    mockSyncProfile.mockResolvedValue(undefined);
   });
 
   it('returns 400 when stripe-signature header is missing', async () => {
@@ -104,7 +90,7 @@ describe('POST /api/webhooks/stripe', () => {
 
   it('returns 200 and credits wallet on first valid event', async () => {
     mockConstructEvent.mockReturnValue(SESSION_COMPLETED_EVENT as never);
-    mockSuccessfulDb();
+    mockRpc.mockResolvedValue({ data: 'credited', error: null } as never);
 
     const res = await POST(makeRequest());
 
@@ -112,9 +98,11 @@ describe('POST /api/webhooks/stripe', () => {
     const body = await res.json();
     expect(body).toEqual({ received: true });
     expect(mockSyncProfile).toHaveBeenCalledWith('user_xyz');
-    expect(mockRpc).toHaveBeenCalledWith('increment_vbucks', {
+    expect(mockRpc).toHaveBeenCalledWith('credit_purchase', {
       p_user_id: 'user_xyz',
-      p_amount: 1500,
+      p_session_id: 'cs_test_abc123',
+      p_vbucks: 1500,
+      p_amount_cents: 798,
     });
   });
 
@@ -129,14 +117,16 @@ describe('POST /api/webhooks/stripe', () => {
         },
       },
     } as never);
-    mockSuccessfulDb();
+    mockRpc.mockResolvedValue({ data: 'credited', error: null } as never);
 
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(200);
-    expect(mockRpc).toHaveBeenCalledWith('increment_vbucks', {
+    expect(mockRpc).toHaveBeenCalledWith('credit_purchase', {
       p_user_id: 'user_xyz',
-      p_amount: 500,
+      p_session_id: 'cs_test_no_packid',
+      p_vbucks: 500,
+      p_amount_cents: 299,
     });
   });
 
@@ -159,14 +149,16 @@ describe('POST /api/webhooks/stripe', () => {
     expect(mockSyncProfile).not.toHaveBeenCalled();
   });
 
-  it('returns 200 and skips processing on duplicate event (idempotent)', async () => {
-    mockConstructEvent.mockReturnValue(SESSION_COMPLETED_EVENT as never);
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'existing' }, error: null }),
-        }),
-      }),
+  it('returns 200 (no-op) when vbucks metadata is not a positive integer', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_nan_vbucks',
+          metadata: { userId: 'user_xyz', vbucks: 'not-a-number' },
+          amount_total: 299,
+        },
+      },
     } as never);
 
     const res = await POST(makeRequest());
@@ -176,33 +168,44 @@ describe('POST /api/webhooks/stripe', () => {
     expect(mockSyncProfile).not.toHaveBeenCalled();
   });
 
+  it('returns 200 and skips processing on duplicate event (RPC reports duplicate)', async () => {
+    mockConstructEvent.mockReturnValue(SESSION_COMPLETED_EVENT as never);
+    mockRpc.mockResolvedValue({ data: 'duplicate', error: null } as never);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    // syncProfile is still called (cheap upsert), but the RPC handles
+    // the idempotency check transactionally — no separate SELECT.
+    expect(mockSyncProfile).toHaveBeenCalledWith('user_xyz');
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+  });
+
   it('returns 500 when syncProfile throws', async () => {
     mockConstructEvent.mockReturnValue(SESSION_COMPLETED_EVENT as never);
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-    } as never);
     mockSyncProfile.mockRejectedValue(new Error('upsert failed'));
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(500);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 when credit_purchase RPC fails (Stripe will retry)', async () => {
+    mockConstructEvent.mockReturnValue(SESSION_COMPLETED_EVENT as never);
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'rpc failed' },
+    } as never);
 
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(500);
   });
 
-  it('returns 500 when DB insert fails (Stripe will retry)', async () => {
+  it('returns 500 when credit_purchase returns an unexpected value', async () => {
     mockConstructEvent.mockReturnValue(SESSION_COMPLETED_EVENT as never);
-    mockSyncProfile.mockResolvedValue(undefined);
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-      insert: vi.fn().mockResolvedValue({ error: { message: 'insert failed' } }),
-    } as never);
+    mockRpc.mockResolvedValue({ data: 'something-else', error: null } as never);
 
     const res = await POST(makeRequest());
 

@@ -41,7 +41,6 @@ export default function BundleContents({ items }: BundleContentsProps) {
                   fill
                   sizes="40px"
                   className="object-cover"
-                  unoptimized
                 />
               ) : (
                 <div

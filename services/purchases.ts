@@ -5,19 +5,13 @@ import { syncProfile } from '@/services/wallet';
 
 export type CreditPurchaseResult =
   | { ok: true; status: 'credited' | 'duplicate' | 'skipped_missing_metadata' }
-  | { ok: false; reason: 'SYNC_FAILED' | 'INSERT_FAILED' | 'CREDIT_FAILED' };
+  | { ok: false; reason: 'SYNC_FAILED' | 'CREDIT_FAILED' };
 
 /**
  * Idempotently credit a Stripe Checkout session to the user's V-Bucks
- * balance. Performs in order:
- *   1. Skip silently if the session is missing required metadata.
- *   2. Skip if a `purchases` row already exists for this session id.
- *   3. Ensure a `profiles` row exists (FK requirement for purchases).
- *   4. Insert the purchases row.
- *   5. Atomically increment the balance via the `increment_vbucks` RPC.
- *
- * Each step that fails returns a discriminated `ok: false` variant so the
- * caller can decide between 200 (skip / duplicate) and 500 (retry).
+ * balance. Insert + balance update happen atomically inside the
+ * `credit_purchase` RPC so a partial commit can't leave a paid user
+ * uncredited.
  */
 export async function creditPurchase(
   session: Stripe.Checkout.Session,
@@ -29,18 +23,13 @@ export async function creditPurchase(
     return { ok: true, status: 'skipped_missing_metadata' };
   }
 
-  const vbucksAmount = parseInt(vbucks, 10);
-  const amountCents = session.amount_total ?? 0;
-
-  const { data: existing } = await supabaseAdmin
-    .from('purchases')
-    .select('id')
-    .eq('stripe_session_id', session.id)
-    .maybeSingle();
-
-  if (existing) {
-    return { ok: true, status: 'duplicate' };
+  const vbucksAmount = Number.parseInt(vbucks, 10);
+  if (!Number.isInteger(vbucksAmount) || vbucksAmount <= 0) {
+    console.error('[stripe webhook] invalid vbucks metadata', session.id, vbucks);
+    return { ok: true, status: 'skipped_missing_metadata' };
   }
+
+  const amountCents = session.amount_total ?? 0;
 
   try {
     await syncProfile(userId);
@@ -49,27 +38,22 @@ export async function creditPurchase(
     return { ok: false, reason: 'SYNC_FAILED' };
   }
 
-  const { error: insertError } = await supabaseAdmin.from('purchases').insert({
-    user_id: userId,
-    stripe_session_id: session.id,
-    vbucks_amount: vbucksAmount,
-    amount_cents: amountCents,
-  });
-
-  if (insertError) {
-    console.error('[stripe webhook] insert purchase failed', insertError.message);
-    return { ok: false, reason: 'INSERT_FAILED' };
-  }
-
-  const { error: rpcError } = await supabaseAdmin.rpc('increment_vbucks', {
+  const { data, error } = await supabaseAdmin.rpc('credit_purchase', {
     p_user_id: userId,
-    p_amount: vbucksAmount,
+    p_session_id: session.id,
+    p_vbucks: vbucksAmount,
+    p_amount_cents: amountCents,
   });
 
-  if (rpcError) {
-    console.error('[stripe webhook] increment_vbucks failed', rpcError.message);
+  if (error) {
+    console.error('[stripe webhook] credit_purchase failed', error.message);
     return { ok: false, reason: 'CREDIT_FAILED' };
   }
 
-  return { ok: true, status: 'credited' };
+  if (data === 'credited' || data === 'duplicate') {
+    return { ok: true, status: data };
+  }
+
+  console.error('[stripe webhook] credit_purchase returned unexpected value', data);
+  return { ok: false, reason: 'CREDIT_FAILED' };
 }

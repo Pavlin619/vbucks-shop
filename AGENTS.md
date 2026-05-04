@@ -20,6 +20,9 @@ Next.js 16 (App Router, TypeScript, Tailwind) · Clerk (auth) · Supabase (Postg
 - No `any` in TypeScript. No `!` without an explanatory comment.
 - Use `@/` path alias always. Never relative imports like `../../lib/x`.
 - All shared types in `types/index.ts`. Never redefine a type locally.
+- Comments explain **why**, not **what**. If the code already shows the
+  step or the comment is a paraphrase of the next line, delete it. See
+  [Comments](#comments) below for the full rule.
 
 ## Next.js App Router conventions
 
@@ -118,6 +121,34 @@ A component over ~120 lines is a smell. Split when you see:
 Pure helpers (formatters, calculators) belong in `_lib/` and should ship
 with their own unit tests.
 
+### Comments
+
+Treat comments as a scarce resource. The bar is "would a competent
+reader of this codebase miss something important without this comment?"
+If the answer is no, delete it.
+
+**Write a comment when:**
+- A non-obvious choice has a non-obvious reason (e.g. "deterministic key
+  so accidental retries dedupe", "RPC handles idempotency atomically").
+- The code defends against a subtle failure mode the reader can't see
+  (e.g. SQLSTATE matching, race-window mitigations, security guards).
+- A constant or magic value comes from an external contract (e.g.
+  Postgres error codes, Stripe API limits).
+
+**Don't write a comment for:**
+- Step-by-step walk-throughs of code that already reads top-to-bottom
+  ("1. fetch X, 2. validate Y, 3. return Z" — the function shows this).
+- JSDoc that paraphrases the function name and its single argument.
+- Historical narratives ("we used to do X but changed to Y") — that
+  belongs in commit messages and migration files, not source.
+- Type annotations in prose ("returns a string of length 64") — TypeScript
+  already says this.
+- Obvious imports/blocks ("// import the module", "// loop over items").
+
+When in doubt, prefer naming things better over adding a comment. A
+function called `buildIdempotencyKey` doesn't need a one-liner saying
+"build the idempotency key".
+
 ## Styling conventions
 
 These rules implement the [Tailwind v4 theme docs](https://tailwindcss.com/docs/theme)
@@ -155,7 +186,9 @@ primitives live in `components/ui/`:
   `secondary`. Renders as `<button>` or `<Link>` via `as`. Use this
   instead of hand-rolling another `rounded-full` pill.
 - [`Card`](components/ui/Card.tsx) — the recurring purple panel.
-  Variants: `default`, `highlight` (accent border).
+  Variants: `default` (no border), `highlight` (accent border, used for
+  modals and gates), `subtle` (translucent white border, used for the
+  cancel page and faint dividers).
 - [`SectionHeading`](components/ui/SectionHeading.tsx) — section title +
   optional subtitle on marketing pages.
 - [`EmptyState`](components/ui/EmptyState.tsx) — empty-list placeholder.
