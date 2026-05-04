@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { stripe } from '@/lib/stripe';
 import { getPackById } from '@/lib/vbucks-packs';
 
@@ -20,13 +21,24 @@ interface CreateCheckoutSessionInput {
 }
 
 /**
- * Validate the cart, build Stripe line items, and create a Checkout Session.
- *
- * Pure server-side orchestration: no auth (the route handler does that)
- * and no HTTP shape — returns a discriminated result the caller maps to
- * a `NextResponse`. Stripe failures are caught and reported via the
- * `STRIPE_FAILED` variant so the route stays free of try/catch noise.
+ * Deterministic key over (userId, sorted cart) so an accidental retry
+ * (browser double-click, network jitter) deduplicates against Stripe's
+ * 24h idempotency cache instead of opening a second Checkout Session.
+ * Exported for unit testing.
  */
+export function buildIdempotencyKey(
+  userId: string,
+  items: CheckoutItemInput[],
+): string {
+  const fingerprint = [...items]
+    .sort((a, b) => a.packId.localeCompare(b.packId))
+    .map((i) => `${i.packId}x${i.quantity}`)
+    .join('|');
+  const hash = createHash('sha256').update(`${userId}|${fingerprint}`).digest('hex');
+  
+  return `co_${hash.slice(0, 32)}`;
+}
+
 export async function createCheckoutSession({
   userId,
   items,
@@ -37,6 +49,7 @@ export async function createCheckoutSession({
   }
 
   let totalVbucks = 0;
+  const validatedItems: CheckoutItemInput[] = [];
   const lineItems: {
     price_data: { currency: string; unit_amount: number; product_data: { name: string } };
     quantity: number;
@@ -51,10 +64,11 @@ export async function createCheckoutSession({
       return { ok: false, reason: 'INVALID_PACK', packId: String(item.packId) };
     }
 
-    // Narrowed by the guard above: `quantity` is a positive integer here.
+    // Narrowed by the guard above.
     const qty = quantity as number;
 
     totalVbucks += pack.vbucks * qty;
+    validatedItems.push({ packId: pack.id, quantity: qty });
     lineItems.push({
       price_data: {
         currency: 'eur',
@@ -66,17 +80,20 @@ export async function createCheckoutSession({
   }
 
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      metadata: { userId, vbucks: String(totalVbucks) },
-      success_url: `${appUrl}/checkout/success`,
-      cancel_url: `${appUrl}/checkout/cancel`,
-    });
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'payment',
+        // Omitting `payment_method_types` lets Stripe surface every
+        // method enabled in the dashboard (card, Link, Apple/Google Pay).
+        client_reference_id: userId,
+        line_items: lineItems,
+        metadata: { userId, vbucks: String(totalVbucks) },
+        success_url: `${appUrl}/checkout/success`,
+        cancel_url: `${appUrl}/checkout/cancel`,
+      },
+      { idempotencyKey: buildIdempotencyKey(userId, validatedItems) },
+    );
 
-    // Stripe types `url` as nullable; in `mode: 'payment'` with a fresh
-    // session it's always populated, but treat it as a failure if not.
     if (!session.url) {
       console.error('[checkout] Stripe returned a session with no URL', session.id);
       return { ok: false, reason: 'STRIPE_FAILED' };

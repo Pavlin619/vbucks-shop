@@ -31,7 +31,6 @@ export default function SkinHero({ entry }: SkinHeroProps) {
         sizes="(max-width: 1024px) 100vw, 40vw"
         className="object-contain object-bottom"
         priority
-        unoptimized
       />
     </div>
   );

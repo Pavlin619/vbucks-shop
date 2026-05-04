@@ -8,8 +8,14 @@ export async function POST(req: Request) {
   // string for the rest of the handler.
   const { userId } = await auth.protect();
 
-  const body = await req.json();
-  const { items } = body as { items?: unknown };
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const { items } = (body as { items?: unknown }) ?? {};
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   const result = await createCheckoutSession({ userId, items, appUrl });

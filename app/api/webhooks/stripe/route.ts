@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
+import { getRequiredEnv } from '@/lib/env';
 import { creditPurchase } from '@/services/purchases';
 
 // Must be disabled so Next.js gives us the raw body for signature verification.
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     event = stripe.webhooks.constructEvent(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!,
+      getRequiredEnv('STRIPE_WEBHOOK_SECRET'),
     );
   } catch {
     console.error('[stripe webhook] signature verification failed');

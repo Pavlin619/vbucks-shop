@@ -50,6 +50,21 @@ describe('POST /api/checkout', () => {
     expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when body is not valid JSON', async () => {
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+
+    const res = await POST(
+      new Request('http://localhost:3000/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'not-json',
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockSessionCreate).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when items array is missing', async () => {
     mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
 
@@ -106,7 +121,48 @@ describe('POST /api/checkout', () => {
           vbucks: '2000',
         }),
       }),
+      expect.any(Object),
     );
+  });
+
+  it('passes client_reference_id and lets Stripe pick payment methods', async () => {
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/x' } as never);
+
+    await POST(makeRequest({ items: validItems }));
+
+    const [params] = mockSessionCreate.mock.calls[0];
+    expect(params).toMatchObject({ client_reference_id: 'user_abc' });
+    // Omitting `payment_method_types` lets Stripe use the dashboard
+    // configuration (card + Link + Apple/Google Pay etc.) instead of
+    // hard-coding to card-only.
+    expect(params).not.toHaveProperty('payment_method_types');
+  });
+
+  it('passes a deterministic idempotencyKey for the same userId + cart', async () => {
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/x' } as never);
+
+    await POST(makeRequest({ items: validItems }));
+    await POST(makeRequest({ items: validItems }));
+
+    const firstKey = mockSessionCreate.mock.calls[0][1]?.idempotencyKey;
+    const secondKey = mockSessionCreate.mock.calls[1][1]?.idempotencyKey;
+    expect(firstKey).toBeTruthy();
+    expect(typeof firstKey).toBe('string');
+    expect(firstKey).toBe(secondKey);
+  });
+
+  it('uses a different idempotencyKey when the cart contents change', async () => {
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/x' } as never);
+
+    await POST(makeRequest({ items: [{ packId: '1000', quantity: 1 }] }));
+    await POST(makeRequest({ items: [{ packId: '500', quantity: 1 }] }));
+
+    const firstKey = mockSessionCreate.mock.calls[0][1]?.idempotencyKey;
+    const secondKey = mockSessionCreate.mock.calls[1][1]?.idempotencyKey;
+    expect(firstKey).not.toBe(secondKey);
   });
 
   it('returns 500 when Stripe throws', async () => {
