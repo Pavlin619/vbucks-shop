@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 import { createCheckoutSession } from '@/services/checkout';
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Middleware already gates unauthenticated callers with a 401. The
+  // call here is defence-in-depth and narrows `userId` to a non-null
+  // string for the rest of the handler.
+  const { userId } = await auth.protect();
 
   const body = await req.json();
   const { items } = body as { items?: unknown };

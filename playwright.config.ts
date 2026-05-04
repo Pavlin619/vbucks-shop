@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+
+// Make `.env.local` visible to the Playwright test process itself. The
+// Next dev server already reads it (via `next dev`), but specs that touch
+// Clerk's testing helpers or seed Supabase need the same vars in-process.
+dotenv.config({ path: '.env.local' });
 
 export default defineConfig({
   testDir: './__tests__/e2e',

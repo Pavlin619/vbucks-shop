@@ -1,6 +1,7 @@
 import 'server-only';
-import type { ShopEntry, ShopSection, ShopTileSize } from '@/types';
+import type { BundleItem, ShopEntry, ShopSection, ShopTileSize } from '@/types';
 import type {
+  RawBrItem,
   RawShopEntry,
   RawShopResponse,
 } from '@/services/skins/fortnite-api.types';
@@ -102,6 +103,55 @@ function pickDescription(entry: RawShopEntry): string | null {
   return entry.brItems?.[0]?.description ?? null;
 }
 
+/**
+ * Cosmetic kind chip rendered under the title on the detail page. We treat
+ * any entry with a `bundle` block as `'bundle'`; otherwise we fall back to
+ * the first `brItems[i].type.value` (e.g. `'outfit'`, `'glider'`).
+ */
+function pickType(entry: RawShopEntry): string {
+  if (entry.bundle) return 'bundle';
+  const t = entry.brItems?.[0]?.type?.value?.trim().toLowerCase();
+  return t || 'cosmetic';
+}
+
+/**
+ * Pick the best icon for a bundle line item. Prefer `smallIcon` (square,
+ * neutral background) → `icon` → `featured`. Returns an empty string when
+ * the API ships no usable image so the UI can render a placeholder.
+ */
+function pickItemIcon(item: RawBrItem): string {
+  return (
+    item.images?.smallIcon?.trim() ||
+    item.images?.icon?.trim() ||
+    item.images?.featured?.trim() ||
+    ''
+  );
+}
+
+/**
+ * Map an entry's `brItems[]` into the public `BundleItem[]` shape. Skips
+ * entries without an `id` or `name` so a single broken item doesn't poison
+ * the whole list. Order from the API is preserved.
+ */
+function pickBundleItems(entry: RawShopEntry): BundleItem[] {
+  if (!entry.bundle) return [];
+  const items = entry.brItems ?? [];
+  const out: BundleItem[] = [];
+  for (const item of items) {
+    const id = item.id?.trim();
+    const name = item.name?.trim();
+    if (!id || !name) continue;
+    out.push({
+      id,
+      name,
+      type: item.type?.value?.trim().toLowerCase() || 'cosmetic',
+      rarity: item.rarity?.value?.trim().toLowerCase() || 'common',
+      image_url: pickItemIcon(item),
+    });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Mapping
 // ---------------------------------------------------------------------------
@@ -130,6 +180,7 @@ export function mapShopEntry(entry: RawShopEntry): ShopEntry | null {
     description: pickDescription(entry),
     image_url: image,
     rarity: pickRarity(entry),
+    type: pickType(entry),
     vbucks_cost: finalPrice,
     regular_price: regularPrice,
     layout: entry.layout?.name?.trim() || null,
@@ -141,6 +192,7 @@ export function mapShopEntry(entry: RawShopEntry): ShopEntry | null {
       color3: toCssHex(colorsRaw.color3),
       text_background: toCssHex(colorsRaw.textBackgroundColor),
     },
+    bundle_items: pickBundleItems(entry),
   };
 }
 

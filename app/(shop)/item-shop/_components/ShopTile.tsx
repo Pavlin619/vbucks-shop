@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import type { ShopEntry } from '@/types';
 import { FALLBACK_COLORS, tileLayout } from '@/app/(shop)/item-shop/_lib/tile-size';
 import { discountPercent } from '@/app/(shop)/item-shop/_lib/format';
@@ -22,13 +23,19 @@ export default function ShopTile({ entry }: ShopTileProps) {
   const colors = entry.colors ?? FALLBACK_COLORS;
   const background = `linear-gradient(135deg, ${colors.color1} 0%, ${colors.color3} 100%)`;
 
+  // The offerId carries `:` and `/` (e.g. `v2:/abc...`) which would break
+  // the dynamic segment if passed raw. Encode once at the boundary.
+  const detailHref = `/item-shop/${encodeURIComponent(entry.offerId)}`;
+
   return (
-    <article
-      className={`group relative rounded-2xl overflow-hidden transition-transform hover:scale-[1.02] ${span}`}
+    <Link
+      href={detailHref}
+      className={`group relative rounded-2xl overflow-hidden transition-transform hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent ${span}`}
       style={{ background }}
       data-testid="skin-card"
       data-offer-id={entry.offerId}
       data-tile-size={entry.tile_size}
+      aria-label={`${entry.name} — ${entry.vbucks_cost} V-Bucks`}
     >
       <div className={`relative w-full ${aspect}`}>
         <Image
@@ -56,6 +63,6 @@ export default function ShopTile({ entry }: ShopTileProps) {
         regularPrice={entry.regular_price}
         isDiscounted={isDiscounted}
       />
-    </article>
+    </Link>
   );
 }
