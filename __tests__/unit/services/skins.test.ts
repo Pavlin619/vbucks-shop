@@ -213,6 +213,7 @@ describe('services/skins — mapShopEntry', () => {
       description: 'Reality is always in flux.',
       image_url: FLUX_FLIER_ENTRY.newDisplayAsset.renderImages[0].image,
       rarity: 'rare',
+      type: 'glider',
       vbucks_cost: 800,
       regular_price: 800,
       layout: 'Battle Ready',
@@ -224,6 +225,7 @@ describe('services/skins — mapShopEntry', () => {
         color3: '#824100',
         text_background: '#824100',
       },
+      bundle_items: [],
     });
   });
 
@@ -235,6 +237,107 @@ describe('services/skins — mapShopEntry', () => {
     expect(result?.vbucks_cost).toBe(1500);
     expect(result?.regular_price).toBe(2000);
     expect(result?.tile_size).toBe('2x1');
+    expect(result?.type).toBe('bundle');
+  });
+
+  it('lifts the brItems list into bundle_items for bundle entries', () => {
+    const entry = {
+      ...ELITE_DAIGO_BUNDLE,
+      brItems: [
+        {
+          id: 'CID_DAIGO',
+          name: 'Elite Daigo',
+          type: { value: 'outfit' },
+          rarity: { value: 'epic' },
+          images: { smallIcon: 'https://x/daigo-small.png' },
+        },
+        {
+          id: 'PICKAXE_DAIGO',
+          name: "Elite Hunter's Knife",
+          type: { value: 'pickaxe' },
+          rarity: { value: 'epic' },
+          images: { icon: 'https://x/knife-icon.png' },
+        },
+      ],
+    };
+
+    const result = mapShopEntry(entry);
+
+    expect(result?.bundle_items).toEqual([
+      {
+        id: 'CID_DAIGO',
+        name: 'Elite Daigo',
+        type: 'outfit',
+        rarity: 'epic',
+        image_url: 'https://x/daigo-small.png',
+      },
+      {
+        id: 'PICKAXE_DAIGO',
+        name: "Elite Hunter's Knife",
+        type: 'pickaxe',
+        rarity: 'epic',
+        image_url: 'https://x/knife-icon.png',
+      },
+    ]);
+  });
+
+  it('skips bundle items missing an id or name without poisoning the list', () => {
+    const entry = {
+      ...ELITE_DAIGO_BUNDLE,
+      brItems: [
+        {
+          id: 'CID_DAIGO',
+          name: 'Elite Daigo',
+          type: { value: 'outfit' },
+          rarity: { value: 'epic' },
+          images: { smallIcon: 'https://x/daigo.png' },
+        },
+        // missing id — must be dropped silently
+        {
+          name: 'Anonymous',
+          type: { value: 'emote' },
+          rarity: { value: 'rare' },
+          images: { icon: 'https://x/emote.png' },
+        },
+        // missing name — must be dropped silently
+        {
+          id: 'GLIDER_X',
+          type: { value: 'glider' },
+          rarity: { value: 'epic' },
+          images: { icon: 'https://x/glider.png' },
+        },
+      ],
+    };
+
+    const result = mapShopEntry(entry);
+
+    expect(result?.bundle_items).toHaveLength(1);
+    expect(result?.bundle_items[0].id).toBe('CID_DAIGO');
+  });
+
+  it('returns an empty bundle_items array for single-skin entries', () => {
+    const result = mapShopEntry(FLUX_FLIER_ENTRY);
+    expect(result?.bundle_items).toEqual([]);
+  });
+
+  it('classifies a single-skin entry by its first brItem type', () => {
+    const result = mapShopEntry(RAVENPOOL_ENTRY);
+    expect(result?.type).toBe('outfit');
+  });
+
+  it('falls back to "cosmetic" when type metadata is missing', () => {
+    const entry = {
+      ...FLUX_FLIER_ENTRY,
+      brItems: [
+        {
+          id: 'X',
+          name: 'X',
+          rarity: { value: 'rare' },
+          images: { icon: 'https://x/x.png' },
+        },
+      ],
+    };
+    expect(mapShopEntry(entry)?.type).toBe('cosmetic');
   });
 
   it('returns null for free entries (finalPrice <= 0)', () => {

@@ -16,10 +16,11 @@ test.describe('/item-shop — public surface', () => {
     await page.waitForURL(/sign-in/, { timeout: 15_000 });
   });
 
-  test('GET /api/skins returns 401 when unauthenticated', async ({ request }) => {
+  test('GET /api/skins is auth-protected', async ({ request }) => {
     const res = await request.get('/api/skins');
-    // Either the API returns 401 directly, or middleware redirects to sign-in.
-    // Both prove the route is protected.
+    // Middleware returns 401 for unauthenticated API requests
+    // (`middleware.ts`). A 3xx is also acceptable for transport-level
+    // redirects (e.g. middleware future-proofing).
     expect([401, 302, 307, 308]).toContain(res.status());
   });
 });

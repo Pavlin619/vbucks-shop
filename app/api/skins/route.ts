@@ -3,11 +3,9 @@ import { NextResponse } from 'next/server';
 import { fetchShopEntries } from '@/services/skins';
 
 export async function GET() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Middleware gates unauthenticated callers with a 401. This call is
+  // defence-in-depth — the userId itself isn't needed by the handler.
+  await auth.protect();
 
   const entries = await fetchShopEntries();
 

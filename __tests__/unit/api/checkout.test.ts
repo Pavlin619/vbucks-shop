@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: vi.fn(),
-}));
+vi.mock('@clerk/nextjs/server', () => {
+  const protect = vi.fn();
+  const authFn = Object.assign(vi.fn(), { protect });
+  return { auth: authFn };
+});
 
 vi.mock('@/lib/stripe', () => ({
   stripe: {
@@ -18,7 +20,7 @@ import { auth } from '@clerk/nextjs/server';
 import { stripe } from '@/lib/stripe';
 import { POST } from '@/app/api/checkout/route';
 
-const mockAuth = vi.mocked(auth);
+const mockAuthProtect = vi.mocked(auth.protect);
 const mockSessionCreate = vi.mocked(stripe.checkout.sessions.create);
 
 const makeRequest = (body: unknown) =>
@@ -36,18 +38,20 @@ describe('POST /api/checkout', () => {
     process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000';
   });
 
-  it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null } as never);
+  it('rejects unauthenticated requests via auth.protect (defence-in-depth)', async () => {
+    // Middleware is the primary auth gate; auth.protect() in the route
+    // is the defensive fallback. When unauth'd, Clerk's auth.protect()
+    // throws (Next renders 404 / NEXT_NOT_FOUND). We verify the call IS
+    // being made and that Stripe is not invoked.
+    mockAuthProtect.mockRejectedValue(new Error('NEXT_NOT_FOUND'));
 
-    const res = await POST(makeRequest({ items: validItems }));
-
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    await expect(POST(makeRequest({ items: validItems }))).rejects.toThrow();
+    expect(mockAuthProtect).toHaveBeenCalled();
+    expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
   it('returns 400 when items array is missing', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
 
     const res = await POST(makeRequest({}));
 
@@ -55,7 +59,7 @@ describe('POST /api/checkout', () => {
   });
 
   it('returns 400 when items array is empty', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
 
     const res = await POST(makeRequest({ items: [] }));
 
@@ -63,7 +67,7 @@ describe('POST /api/checkout', () => {
   });
 
   it('returns 400 for an unknown packId', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
 
     const res = await POST(makeRequest({ items: [{ packId: 'invalid-pack', quantity: 1 }] }));
 
@@ -71,7 +75,7 @@ describe('POST /api/checkout', () => {
   });
 
   it('returns 200 with Stripe checkout URL for a valid cart', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
     mockSessionCreate.mockResolvedValue({
       url: 'https://checkout.stripe.com/test_session',
     } as never);
@@ -84,7 +88,7 @@ describe('POST /api/checkout', () => {
   });
 
   it('passes correct total vbucks in metadata for a multi-item cart', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
     mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/x' } as never);
 
     // 1000 V-Bucks × 1 + 500 V-Bucks × 2 = 2000 V-Bucks
@@ -106,7 +110,7 @@ describe('POST /api/checkout', () => {
   });
 
   it('returns 500 when Stripe throws', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
     mockSessionCreate.mockRejectedValue(new Error('Stripe unavailable'));
 
     const res = await POST(makeRequest({ items: validItems }));

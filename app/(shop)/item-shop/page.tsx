@@ -1,5 +1,4 @@
 import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ShopGrid from '@/app/(shop)/item-shop/_components/ShopGrid';
@@ -13,11 +12,9 @@ export const metadata = {
 };
 
 export default async function ItemShopPage() {
-  const { userId } = await auth();
-  if (!userId) {
-    // Middleware should already handle this; belt-and-braces redirect.
-    redirect('/sign-in');
-  }
+  // Middleware already redirects unauthenticated visitors. The call here
+  // is defence-in-depth and narrows `userId` to a non-null string.
+  const { userId } = await auth.protect();
 
   const profile = await getProfile(userId);
   const fortniteUsername = profile.fortnite_username?.trim() ?? '';

@@ -61,7 +61,7 @@ everything they import gets bundled and shipped to the browser.
 
 API route handlers in `app/api/**/route.ts` should be ~30 lines:
 
-1. `const { userId } = await auth()` — auth gate
+1. `const { userId } = await auth.protect()` — defence-in-depth auth gate
 2. Validate request input
 3. Delegate to a `services/` function
 4. Translate the result into a `NextResponse`
@@ -69,6 +69,35 @@ API route handlers in `app/api/**/route.ts` should be ~30 lines:
 Business logic, RPC calls, third-party SDK orchestration — all of that
 lives in `services/`. Route handlers should never call `supabaseAdmin.rpc`,
 `stripe.checkout.sessions.create`, etc. directly.
+
+### Auth-by-default; whitelist public routes
+
+All routes (pages **and** APIs) require a Clerk session unless explicitly
+listed as public. The single source of truth is `isPublicRoute` in
+[`middleware.ts`](middleware.ts). The middleware:
+
+- Redirects unauthenticated **page** requests to the Clerk sign-in page.
+- Returns `401 { error: 'Unauthorized' }` for unauthenticated **API**
+  requests (overrides Clerk's default `404`, which is meant to obscure
+  protected routes — we don't need that for this app).
+
+Server Components and route handlers further down the stack still call
+`auth.protect()` themselves. Two reasons:
+
+1. **Defence in depth** — if `isPublicRoute` is misconfigured, the route
+   still refuses to run for an unauthenticated caller.
+2. **Type narrowing** — `await auth.protect()` returns an Auth object
+   with `userId: string` (non-null). It's a one-liner replacement for
+   `await auth()` + `if (!userId) return 401`.
+
+Use `await auth.protect()` in every protected page and route. **Never**
+hand-roll a `if (!userId) return 401` branch — it's dead code under the
+new middleware contract.
+
+Client-side, hooks that fetch a protected API only need to handle `401`
+to redirect to sign-in (see `use-place-order.ts`, `use-checkout.ts`).
+The hook handles **session-expiry mid-flow** — without it, a stale
+session surfaces "Order failed" inline instead of bouncing the user.
 
 ### File naming
 
