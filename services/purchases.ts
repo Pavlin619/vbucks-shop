@@ -1,11 +1,10 @@
 import 'server-only';
 import type Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { syncProfile } from '@/services/wallet';
 
 export type CreditPurchaseResult =
   | { ok: true; status: 'credited' | 'duplicate' | 'skipped_missing_metadata' }
-  | { ok: false; reason: 'SYNC_FAILED' | 'CREDIT_FAILED' };
+  | { ok: false; reason: 'CREDIT_FAILED' };
 
 /**
  * Idempotently credit a Stripe Checkout session to the user's V-Bucks
@@ -30,13 +29,6 @@ export async function creditPurchase(
   }
 
   const amountCents = session.amount_total ?? 0;
-
-  try {
-    await syncProfile(userId);
-  } catch (err) {
-    console.error('[stripe webhook] syncProfile failed', err);
-    return { ok: false, reason: 'SYNC_FAILED' };
-  }
 
   const { data, error } = await supabaseAdmin.rpc('credit_purchase', {
     p_user_id: userId,

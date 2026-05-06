@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ShoppingCart, Zap, Menu, X } from 'lucide-react';
+import { ShoppingCart, Zap, Menu, X, LogOut } from 'lucide-react';
+import { useClerk } from '@clerk/nextjs';
 import { useCart } from '@/contexts/CartContext';
 import Button from '@/components/ui/Button';
 
@@ -17,6 +18,7 @@ const NAV_LINKS = [
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { totalItems } = useCart();
+  const { signOut } = useClerk();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -54,6 +56,15 @@ export default function Header() {
             <span>
               Количка (<span data-testid="cart-count">{totalItems}</span>)
             </span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => signOut({ redirectUrl: '/sign-in' })}
+            aria-label="Sign out"
+          >
+            <LogOut className="w-4 h-4" />
           </Button>
 
           <button
