@@ -26,7 +26,7 @@ export async function getProfile(userId: string): Promise<Profile> {
 
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .select('id, fortnite_username, vbucks_balance, created_at, updated_at')
+    .select('id, fortnite_username, vbucks_balance, friend_request_status, friend_request_accepted_at, created_at, updated_at')
     .eq('id', userId)
     .single();
 

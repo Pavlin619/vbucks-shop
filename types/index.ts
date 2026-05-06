@@ -5,3 +5,5 @@ export * from '@/types/profile';
 export * from '@/types/purchase';
 export * from '@/types/orders';
 export * from '@/types/shop';
+export * from '@/types/admin';
+export * from '@/types/wallet';

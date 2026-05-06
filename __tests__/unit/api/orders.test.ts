@@ -10,6 +10,10 @@ vi.mock('@/services/orders', () => ({
   createOrder: vi.fn(),
 }));
 
+vi.mock('@/services/email', () => ({
+  sendOrderPlacedNotificationToAdmin: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { auth } from '@clerk/nextjs/server';
 import { createOrder } from '@/services/orders';
 import { POST } from '@/app/api/orders/route';

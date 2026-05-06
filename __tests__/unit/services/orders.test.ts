@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const mockRpc = vi.hoisted(() => vi.fn());
+const mockFrom = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: {
-    rpc: vi.fn(),
+    rpc: mockRpc,
+    from: mockFrom,
   },
 }));
 
@@ -14,13 +18,17 @@ vi.mock('@/services/skins', () => ({
   fetchShopEntries: vi.fn(),
 }));
 
-import { supabaseAdmin } from '@/lib/supabase/admin';
+vi.mock('@/services/email', () => ({
+  sendOrderPlacedNotificationToAdmin: vi.fn().mockResolvedValue(undefined),
+  sendOrderFulfilledNotificationToAdmin: vi.fn().mockResolvedValue(undefined),
+  sendOrderRefundedNotificationToAdmin: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { getProfile } from '@/services/wallet';
 import { fetchShopEntries } from '@/services/skins';
-import { createOrder } from '@/services/orders';
+import { createOrder, fulfillOrder } from '@/services/orders';
 import type { Profile, ShopEntry } from '@/types';
 
-const mockRpc = vi.mocked(supabaseAdmin.rpc);
 const mockGetProfile = vi.mocked(getProfile);
 const mockFetchEntries = vi.mocked(fetchShopEntries);
 
@@ -52,10 +60,33 @@ const profileWith = (overrides: Partial<Profile>): Profile => ({
   id: 'user_abc',
   fortnite_username: 'NinjaPlayer123',
   vbucks_balance: 5000,
+  friend_request_status: 'accepted',
+  friend_request_accepted_at: '2026-04-17T00:00:00Z',
   created_at: '2026-04-17T00:00:00Z',
   updated_at: '2026-04-17T00:00:00Z',
   ...overrides,
 });
+
+// Returns a thenable Supabase query builder whose terminal calls resolve to
+// { data, error }. Using thenable (not a real Promise) lets us attach .single()
+// while still being directly await-able when a chain ends with .eq().
+function mockQueryResult(data: unknown, error: { message: string } | null = null) {
+  const resolved = Promise.resolve({ data, error });
+  const builder: Record<string, unknown> = {
+    select: () => builder,
+    update: () => builder,
+    eq: () => builder,
+    single: () => resolved,
+    then: resolved.then.bind(resolved),
+    catch: resolved.catch.bind(resolved),
+    finally: resolved.finally.bind(resolved),
+  };
+  return builder;
+}
+
+// ---------------------------------------------------------------------------
+// createOrder
+// ---------------------------------------------------------------------------
 
 describe('services/orders — createOrder', () => {
   beforeEach(() => {
@@ -177,5 +208,78 @@ describe('services/orders — createOrder', () => {
     const result = await createOrder('user_abc', RAVENPOOL_OFFER_ID);
 
     expect(result).toEqual({ ok: false, reason: 'DB_ERROR' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fulfillOrder
+// ---------------------------------------------------------------------------
+
+const PENDING_ORDER = {
+  id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  status: 'pending',
+  user_id: 'user_abc',
+  vbucks_cost: 1500,
+  skin_name: 'Ravenpool',
+};
+
+describe('services/orders — fulfillOrder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.ADMIN_EMAILS;
+  });
+
+  it('throws when the order is not found', async () => {
+    mockFrom.mockReturnValueOnce(mockQueryResult(null, { message: 'not found' }));
+
+    await expect(fulfillOrder(PENDING_ORDER.id, 'gifted')).rejects.toThrow('Order not found');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('throws when the order is already resolved (not pending)', async () => {
+    mockFrom.mockReturnValueOnce(mockQueryResult({ ...PENDING_ORDER, status: 'gifted' }));
+
+    await expect(fulfillOrder(PENDING_ORDER.id, 'gifted')).rejects.toThrow('Order is not pending');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('gifted path: updates skin_orders directly and does not call any RPC', async () => {
+    mockFrom
+      .mockReturnValueOnce(mockQueryResult(PENDING_ORDER))  // fetch order
+      .mockReturnValueOnce(mockQueryResult(null));           // update order
+
+    await fulfillOrder(PENDING_ORDER.id, 'gifted');
+
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockFrom).toHaveBeenNthCalledWith(1, 'skin_orders');
+    expect(mockFrom).toHaveBeenNthCalledWith(2, 'skin_orders');
+  });
+
+  it('gifted path: throws when the skin_orders update fails', async () => {
+    mockFrom
+      .mockReturnValueOnce(mockQueryResult(PENDING_ORDER))
+      .mockReturnValueOnce(mockQueryResult(null, { message: 'update failed' }));
+
+    await expect(fulfillOrder(PENDING_ORDER.id, 'gifted')).rejects.toThrow('update failed');
+  });
+
+  it('refunded path: calls refund_order RPC and does not do a separate skin_orders update', async () => {
+    mockFrom.mockReturnValueOnce(mockQueryResult(PENDING_ORDER));  // fetch order
+    mockRpc.mockResolvedValue({ data: null, error: null } as never);
+
+    await fulfillOrder(PENDING_ORDER.id, 'refunded');
+
+    expect(mockRpc).toHaveBeenCalledWith('refund_order', { p_order_id: PENDING_ORDER.id });
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    // Only one from() call: the initial order fetch. The refund RPC handles everything else.
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+    expect(mockFrom).toHaveBeenCalledWith('skin_orders');
+  });
+
+  it('refunded path: throws when refund_order RPC fails', async () => {
+    mockFrom.mockReturnValueOnce(mockQueryResult(PENDING_ORDER));
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'rpc failed' } } as never);
+
+    await expect(fulfillOrder(PENDING_ORDER.id, 'refunded')).rejects.toThrow('rpc failed');
   });
 });

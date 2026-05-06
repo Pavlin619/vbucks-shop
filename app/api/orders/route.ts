@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createOrder } from '@/services/orders';
+import { sendOrderPlacedNotificationToAdmin } from '@/services/email';
 
 export async function POST(req: Request) {
   const { userId } = await auth.protect();
@@ -24,6 +25,19 @@ export async function POST(req: Request) {
   const result = await createOrder(userId, skinId);
 
   if (result.ok) {
+    const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (adminEmails.length > 0) {
+      sendOrderPlacedNotificationToAdmin(
+        adminEmails,
+        userId,
+        result.skinName,
+        result.vbucksCost,
+      ).catch((err) => console.error('[api/orders] admin email failed', err));
+    }
+
     return NextResponse.json(
       {
         orderId: result.orderId,

@@ -16,12 +16,18 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
+vi.mock('@/services/wallet', () => ({
+  getProfile: vi.fn(),
+}));
+
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '@/lib/stripe';
+import { getProfile } from '@/services/wallet';
 import { POST } from '@/app/api/checkout/route';
 
 const mockAuthProtect = vi.mocked(auth.protect);
 const mockSessionCreate = vi.mocked(stripe.checkout.sessions.create);
+const mockGetProfile = vi.mocked(getProfile);
 
 const makeRequest = (body: unknown) =>
   new Request('http://localhost:3000/api/checkout', {
@@ -32,10 +38,21 @@ const makeRequest = (body: unknown) =>
 
 const validItems = [{ packId: '1000', quantity: 1 }];
 
+const validProfile = {
+  id: 'user_abc',
+  fortnite_username: 'NinjaPlayer123',
+  vbucks_balance: 5000,
+  friend_request_status: 'accepted' as const,
+  friend_request_accepted_at: '2026-04-17T00:00:00Z',
+  created_at: '2026-04-17T00:00:00Z',
+  updated_at: '2026-04-17T00:00:00Z',
+};
+
 describe('POST /api/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000';
+    mockGetProfile.mockResolvedValue(validProfile);
   });
 
   it('rejects unauthenticated requests via auth.protect (defence-in-depth)', async () => {
@@ -47,6 +64,18 @@ describe('POST /api/checkout', () => {
 
     await expect(POST(makeRequest({ items: validItems }))).rejects.toThrow();
     expect(mockAuthProtect).toHaveBeenCalled();
+    expect(mockSessionCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 when the user has no Fortnite username set', async () => {
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockGetProfile.mockResolvedValue({ ...validProfile, fortnite_username: null });
+
+    const res = await POST(makeRequest({ items: validItems }));
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'fortnite_username_required' });
     expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
