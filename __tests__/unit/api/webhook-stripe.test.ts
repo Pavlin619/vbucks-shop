@@ -15,7 +15,6 @@ vi.mock('@/lib/supabase/admin', () => ({
 }));
 
 vi.mock('@/services/wallet', () => ({
-  syncProfile: vi.fn(),
   getProfile: vi.fn(),
 }));
 
@@ -29,7 +28,7 @@ vi.mock('next/headers', () => ({
 
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { syncProfile, getProfile } from '@/services/wallet';
+import { getProfile } from '@/services/wallet';
 import { sendVBucksPurchaseNotificationToAdmin } from '@/services/email';
 import { headers } from 'next/headers';
 import { POST } from '@/app/api/webhooks/stripe/route';
@@ -37,7 +36,6 @@ import { POST } from '@/app/api/webhooks/stripe/route';
 const mockConstructEvent = vi.mocked(stripe.webhooks.constructEvent);
 const mockHeaders = vi.mocked(headers);
 const mockRpc = vi.mocked(supabaseAdmin.rpc);
-const mockSyncProfile = vi.mocked(syncProfile);
 const mockGetProfile = vi.mocked(getProfile);
 const mockSendAdminEmail = vi.mocked(sendVBucksPurchaseNotificationToAdmin);
 
@@ -69,7 +67,6 @@ describe('POST /api/webhooks/stripe', () => {
     vi.clearAllMocks();
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
     process.env.ADMIN_EMAILS = '';
-    mockSyncProfile.mockResolvedValue(undefined);
     mockGetProfile.mockResolvedValue({
       id: 'user_xyz',
       fortnite_username: 'NinjaPlayer',
@@ -115,7 +112,6 @@ describe('POST /api/webhooks/stripe', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ received: true });
-    expect(mockSyncProfile).toHaveBeenCalledWith('user_xyz');
     expect(mockRpc).toHaveBeenCalledWith('credit_purchase', {
       p_user_id: 'user_xyz',
       p_session_id: 'cs_test_abc123',
@@ -130,7 +126,7 @@ describe('POST /api/webhooks/stripe', () => {
       data: {
         object: {
           id: 'cs_test_no_packid',
-          metadata: { userId: 'user_xyz', vbucks: '500' }, // no packId
+          metadata: { userId: 'user_xyz', vbucks: '500' },
           amount_total: 299,
         },
       },
@@ -154,7 +150,7 @@ describe('POST /api/webhooks/stripe', () => {
       data: {
         object: {
           id: 'cs_test_bad_metadata',
-          metadata: {}, // missing userId and vbucks
+          metadata: {},
           amount_total: 299,
         },
       },
@@ -164,7 +160,6 @@ describe('POST /api/webhooks/stripe', () => {
 
     expect(res.status).toBe(200);
     expect(mockRpc).not.toHaveBeenCalled();
-    expect(mockSyncProfile).not.toHaveBeenCalled();
   });
 
   it('returns 200 (no-op) when vbucks metadata is not a positive integer', async () => {
@@ -183,7 +178,6 @@ describe('POST /api/webhooks/stripe', () => {
 
     expect(res.status).toBe(200);
     expect(mockRpc).not.toHaveBeenCalled();
-    expect(mockSyncProfile).not.toHaveBeenCalled();
   });
 
   it('returns 200 and skips processing on duplicate event (RPC reports duplicate)', async () => {
@@ -193,20 +187,7 @@ describe('POST /api/webhooks/stripe', () => {
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(200);
-    // syncProfile is still called (cheap upsert), but the RPC handles
-    // the idempotency check transactionally — no separate SELECT.
-    expect(mockSyncProfile).toHaveBeenCalledWith('user_xyz');
     expect(mockRpc).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns 500 when syncProfile throws', async () => {
-    mockConstructEvent.mockReturnValue(SESSION_COMPLETED_EVENT as never);
-    mockSyncProfile.mockRejectedValue(new Error('upsert failed'));
-
-    const res = await POST(makeRequest());
-
-    expect(res.status).toBe(500);
-    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it('returns 500 when credit_purchase RPC fails (Stripe will retry)', async () => {
