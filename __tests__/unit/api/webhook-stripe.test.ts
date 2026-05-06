@@ -16,6 +16,11 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/services/wallet', () => ({
   syncProfile: vi.fn(),
+  getProfile: vi.fn(),
+}));
+
+vi.mock('@/services/email', () => ({
+  sendVBucksPurchaseNotificationToAdmin: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('next/headers', () => ({
@@ -24,7 +29,8 @@ vi.mock('next/headers', () => ({
 
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { syncProfile } from '@/services/wallet';
+import { syncProfile, getProfile } from '@/services/wallet';
+import { sendVBucksPurchaseNotificationToAdmin } from '@/services/email';
 import { headers } from 'next/headers';
 import { POST } from '@/app/api/webhooks/stripe/route';
 
@@ -32,6 +38,8 @@ const mockConstructEvent = vi.mocked(stripe.webhooks.constructEvent);
 const mockHeaders = vi.mocked(headers);
 const mockRpc = vi.mocked(supabaseAdmin.rpc);
 const mockSyncProfile = vi.mocked(syncProfile);
+const mockGetProfile = vi.mocked(getProfile);
+const mockSendAdminEmail = vi.mocked(sendVBucksPurchaseNotificationToAdmin);
 
 const VALID_SIG = 't=123,v1=abc';
 
@@ -60,7 +68,17 @@ describe('POST /api/webhooks/stripe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+    process.env.ADMIN_EMAILS = '';
     mockSyncProfile.mockResolvedValue(undefined);
+    mockGetProfile.mockResolvedValue({
+      id: 'user_xyz',
+      fortnite_username: 'NinjaPlayer',
+      vbucks_balance: 1000,
+      friend_request_status: 'accepted',
+      friend_request_accepted_at: '2026-04-17T00:00:00Z',
+      created_at: '2026-04-17T00:00:00Z',
+      updated_at: '2026-04-17T00:00:00Z',
+    });
   });
 
   it('returns 400 when stripe-signature header is missing', async () => {

@@ -13,19 +13,29 @@
 
 One row per registered user. Keyed on Clerk userId (not Supabase auth).
 
-| Column             | Type      | Constraints                          | Notes                                 |
-|--------------------|-----------|--------------------------------------|---------------------------------------|
-| `id`               | `uuid`    | PRIMARY KEY                          | Equals Clerk userId exactly           |
-| `fortnite_username`| `text`    | NULLABLE                             | Must be set before skin purchase      |
-| `vbucks_balance`   | `integer` | NOT NULL DEFAULT 0, CHECK (>= 0)     | Mutated only via `increment_vbucks`   |
-| `created_at`       | `timestamptz` | NOT NULL DEFAULT now()           |                                       |
-| `updated_at`       | `timestamptz` | NOT NULL DEFAULT now()           | Updated by trigger on any row change  |
+| Column                       | Type          | Constraints                                                                    | Notes                                                      |
+|------------------------------|---------------|--------------------------------------------------------------------------------|------------------------------------------------------------|
+| `id`                         | `uuid`        | PRIMARY KEY                                                                    | Equals Clerk userId exactly                                |
+| `fortnite_username`          | `text`        | NULLABLE                                                                       | Required before checkout or skin purchase                  |
+| `vbucks_balance`             | `integer`     | NOT NULL DEFAULT 0, CHECK (>= 0)                                               | Mutated only via `increment_vbucks`                        |
+| `friend_request_status`      | `text`        | NOT NULL DEFAULT 'not_sent', CHECK IN ('not_sent','pending','accepted')        | Admin toggles; drives item-shop access gate                |
+| `friend_request_accepted_at` | `timestamptz` | NULLABLE                                                                       | Set when status → `accepted`; cleared when status changes away |
+| `created_at`                 | `timestamptz` | NOT NULL DEFAULT now()                                                         |                                                            |
+| `updated_at`                 | `timestamptz` | NOT NULL DEFAULT now()                                                         | Updated by trigger on any row change                       |
 
 **RLS policies**:
 - `SELECT`: user can read own row only (`id = auth.uid()` is not used — Clerk userId
   is passed via service-role calls; RLS for `profiles` restricts anon reads to own row
   using a custom claim or via service role exclusively).
 - `INSERT`/`UPDATE`/`DELETE`: service role only (no client writes).
+
+**State machine for `friend_request_status`**:
+```
+not_sent → pending   (admin sends friend request in-game)
+pending  → accepted  (user accepted; sets friend_request_accepted_at = now())
+accepted → pending   (admin resets — e.g. user removed admin from friends)
+any      → not_sent  (admin resets fully; clears friend_request_accepted_at)
+```
 
 ---
 
@@ -72,75 +82,71 @@ One row per skin purchase request.
 
 ---
 
-## Database Functions
+### `wallet_transactions`
 
-### `increment_vbucks(p_user_id uuid, p_amount integer) → void`
+Append-only VBucks ledger. Every balance mutation — Stripe top-up, skin purchase,
+refund — writes one row here in the same DB transaction as the mutation.
 
-Atomically adds `p_amount` to `profiles.vbucks_balance` for the given user.
+| Column         | Type          | Constraints                                                                | Notes                                                                |
+|----------------|---------------|----------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `id`           | `uuid`        | PRIMARY KEY DEFAULT gen_random_uuid()                                      |                                                                      |
+| `user_id`      | `text`        | NOT NULL, FK → profiles.id                                                 |                                                                      |
+| `amount`       | `integer`     | NOT NULL                                                                   | Positive = credit (`stripe_credit`, `refund`); negative = debit (`skin_purchase`) |
+| `type`         | `text`        | NOT NULL, CHECK IN ('stripe_credit', 'skin_purchase', 'refund')            |                                                                      |
+| `reference_id` | `uuid`        | NULLABLE                                                                   | `purchases.id` for `stripe_credit`; `skin_orders.id` for others     |
+| `balance_after`| `integer`     | NOT NULL                                                                   | Cached `profiles.vbucks_balance` immediately after this mutation     |
+| `created_at`   | `timestamptz` | NOT NULL DEFAULT now()                                                     |                                                                      |
 
-```sql
-CREATE OR REPLACE FUNCTION increment_vbucks(p_user_id uuid, p_amount integer)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  UPDATE profiles
-  SET vbucks_balance = vbucks_balance + p_amount,
-      updated_at = now()
-  WHERE id = p_user_id;
+`balance_after` is derived from `UPDATE … RETURNING vbucks_balance` inside each RPC, so it
+is always consistent with the actual balance at that point in time.
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Profile not found: %', p_user_id;
-  END IF;
-
-  -- The CHECK (vbucks_balance >= 0) constraint on the column will raise
-  -- automatically if the result would be negative.
-END;
-$$;
-```
-
-Called by: Stripe webhook handler (credit) and admin refund handler (credit).
+**RLS policies**:
+- `SELECT`: `USING (false)` — all reads go through the service role, which bypasses RLS.
+- `INSERT`: service role only (via RPCs).
+- `UPDATE`/`DELETE`: nobody — immutable ledger.
 
 ---
 
-### `buy_skin(p_user_id uuid, p_skin_id text, p_skin_name text, p_vbucks_cost integer) → uuid`
+## Database Functions
 
-Atomic skin purchase: deducts balance and creates order in a single transaction.
-Returns the new order's `id`.
+### `increment_vbucks` — removed
 
-```sql
-CREATE OR REPLACE FUNCTION buy_skin(
-  p_user_id     uuid,
-  p_skin_id     text,
-  p_skin_name   text,
-  p_vbucks_cost integer
-) RETURNS uuid
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  v_order_id uuid;
-BEGIN
-  -- Deduct balance (raises if balance < cost via CHECK constraint)
-  UPDATE profiles
-  SET vbucks_balance = vbucks_balance - p_vbucks_cost,
-      updated_at = now()
-  WHERE id = p_user_id;
+Was used by the refund path but dropped once `refund_order` (below) made the
+operation atomic. No longer present in the schema.
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Profile not found: %', p_user_id;
-  END IF;
+---
 
-  -- Create order
-  INSERT INTO skin_orders (user_id, skin_id, skin_name, vbucks_cost, status)
-  VALUES (p_user_id, p_skin_id, p_skin_name, p_vbucks_cost, 'pending')
-  RETURNING id INTO v_order_id;
+### `buy_skin(p_user_id text, p_skin_id text, p_skin_name text, p_vbucks_cost integer) → uuid`
 
-  RETURN v_order_id;
-END;
-$$;
-```
+Atomic skin purchase: deducts balance, creates order, and writes a `wallet_transactions`
+ledger entry — all in one transaction. Returns the new order's `id`.
 
 Called by: `POST /api/orders` route.
+
+---
+
+### `credit_purchase(p_user_id text, p_session_id text, p_vbucks integer, p_amount_cents integer) → text`
+
+Idempotent Stripe credit: inserts a `purchases` row (ON CONFLICT DO NOTHING on
+`stripe_session_id`), updates `profiles.vbucks_balance`, and writes a
+`wallet_transactions` ledger entry — all in one transaction.
+
+Returns `'credited'` or `'duplicate'`.
+
+Called by: Stripe webhook handler.
+
+---
+
+### `refund_order(p_order_id uuid) → void`
+
+Atomic refund: marks a `skin_orders` row as `'refunded'`, credits `profiles.vbucks_balance`,
+and writes a `wallet_transactions` ledger entry — all in one transaction. Uses
+`FOR UPDATE` on the order row to serialise concurrent refund attempts.
+
+Replaces the previous non-atomic two-step (UPDATE status, then `increment_vbucks`),
+which could leave an order marked refunded with no corresponding balance credit on failure.
+
+Called by: admin fulfillment route (refund action).
 
 ---
 
@@ -153,10 +159,14 @@ Planned migration files:
 
 | File | Contents |
 |------|----------|
-| `20260417_init_profiles.sql` | `profiles` table, RLS policies, `updated_at` trigger |
-| `20260417_init_purchases.sql` | `purchases` table, RLS policies |
-| `20260417_init_skin_orders.sql` | `skin_orders` table, RLS policies |
-| `20260417_functions.sql` | `increment_vbucks` and `buy_skin` functions |
+| `20260417000000_init_profiles.sql` | `profiles` table, RLS policies, `updated_at` trigger |
+| `20260417000001_init_purchases.sql` | `purchases` table, RLS policies |
+| `20260417000002_init_skin_orders.sql` | `skin_orders` table, RLS policies |
+| `20260417000003_functions.sql` | `increment_vbucks` and `buy_skin` functions (initial) |
+| `20260501000000_user_id_uuid_to_text.sql` | Change all user_id columns from `uuid` → `text` for Clerk IDs |
+| `20260504000000_credit_purchase_rpc.sql` | Atomic `credit_purchase` RPC (replaces two-step webhook flow) |
+| `20260506000000_wallet_transactions.sql` | `wallet_transactions` ledger table, RLS, backfill from existing data |
+| `20260506000001_update_balance_rpcs.sql` | Drop `increment_vbucks`; update `credit_purchase` and `buy_skin` to write ledger; add `refund_order` RPC |
 
 ---
 
@@ -165,7 +175,12 @@ Planned migration files:
 ```
 profiles (1) ──── (many) purchases
 profiles (1) ──── (many) skin_orders
+profiles (1) ──── (many) wallet_transactions
 ```
+
+`wallet_transactions.reference_id` is a soft pointer — `purchases.id` for
+`stripe_credit` rows, `skin_orders.id` for `skin_purchase` and `refund` rows.
+No DB-level FK is enforced because the column is polymorphic.
 
 No foreign key from `skin_orders` to an external skins table — skin details are
 snapshotted at order time (`skin_id`, `skin_name`, `vbucks_cost`).
@@ -194,12 +209,33 @@ status updates from `pending` in the admin fulfillment route.
 ```typescript
 export type OrderStatus = 'pending' | 'gifted' | 'refunded';
 
+export type FriendRequestStatus = 'not_sent' | 'pending' | 'accepted';
+
 export interface Profile {
   id: string;
   fortnite_username: string | null;
   vbucks_balance: number;
+  friend_request_status: FriendRequestStatus;
+  friend_request_accepted_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Returned by services/admin.ts getRecentVBucksPurchasers()
+export interface PurchaserWithStatus {
+  purchase_id: string;
+  user_id: string;
+  fortnite_username: string | null;
+  vbucks_amount: number;
+  amount_cents: number;
+  purchased_at: string;
+  friend_request_status: FriendRequestStatus;
+  friend_request_accepted_at: string | null;
+}
+
+// Returned by services/orders.ts getPendingOrders()
+export interface SkinOrderWithUsername extends SkinOrder {
+  fortnite_username: string | null;
 }
 
 export interface Purchase {
@@ -236,6 +272,18 @@ export interface ShopEntry {
   vbucks_cost: number;      // = finalPrice from /v2/shop
   regular_price: number;    // = regularPrice from /v2/shop (used for sale strikethrough)
   layout: string | null;    // shop layout name (e.g. "Battle Ready", "Jam Tracks")
+}
+
+export type WalletTransactionType = 'stripe_credit' | 'skin_purchase' | 'refund';
+
+export interface WalletTransaction {
+  id: string;
+  user_id: string;
+  amount: number;      // positive = credit, negative = debit
+  type: WalletTransactionType;
+  reference_id: string | null;   // purchases.id or skin_orders.id
+  balance_after: number;
+  created_at: string;
 }
 
 export interface VBucksPack {

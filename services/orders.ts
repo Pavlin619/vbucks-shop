@@ -2,6 +2,11 @@ import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getProfile } from '@/services/wallet';
 import { fetchShopEntries } from '@/services/skins';
+import {
+  sendOrderFulfilledNotificationToAdmin,
+  sendOrderRefundedNotificationToAdmin,
+} from '@/services/email';
+import type { SkinOrderWithUsername } from '@/types';
 
 /**
  * Outcome of a `createOrder` call. The discriminated `ok` flag lets the
@@ -104,4 +109,102 @@ export async function createOrder(
     vbucksCost: entry.vbucks_cost,
     remainingBalance: profile.vbucks_balance - entry.vbucks_cost,
   };
+}
+
+export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {
+  const { data: orders, error } = await supabaseAdmin
+    .from('skin_orders')
+    .select('id, user_id, skin_id, skin_name, vbucks_cost, status, created_at, resolved_at')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[services/orders] getPendingOrders failed', error.message);
+    return [];
+  }
+  if (!orders || orders.length === 0) return [];
+
+  const userIds = [...new Set(orders.map((o: { user_id: string }) => o.user_id))];
+  const { data: profiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id, fortnite_username')
+    .in('id', userIds);
+
+  const profileMap = new Map(
+    (profiles ?? []).map((p: { id: string; fortnite_username: string | null }) => [
+      p.id,
+      p.fortnite_username,
+    ]),
+  );
+
+  return orders.map(
+    (order: {
+      id: string;
+      user_id: string;
+      skin_id: string;
+      skin_name: string;
+      vbucks_cost: number;
+      status: string;
+      created_at: string;
+      resolved_at: string | null;
+    }) => ({
+      ...order,
+      status: order.status as SkinOrderWithUsername['status'],
+      fortnite_username: profileMap.get(order.user_id) ?? null,
+    }),
+  );
+}
+
+export async function fulfillOrder(
+  orderId: string,
+  action: 'gifted' | 'refunded',
+): Promise<void> {
+  const { data: order, error: fetchError } = await supabaseAdmin
+    .from('skin_orders')
+    .select('id, status, user_id, vbucks_cost, skin_name')
+    .eq('id', orderId)
+    .single();
+
+  if (fetchError || !order) throw new Error('Order not found');
+  if (order.status !== 'pending') throw new Error('Order is not pending');
+
+  if (action === 'gifted') {
+    const { error } = await supabaseAdmin
+      .from('skin_orders')
+      .update({ status: 'gifted', resolved_at: new Date().toISOString() })
+      .eq('id', orderId);
+    if (error) throw new Error(error.message);
+  } else {
+    // refund_order atomically: updates status, credits balance, writes ledger entry.
+    const { error } = await supabaseAdmin.rpc('refund_order', { p_order_id: orderId });
+    if (error) throw new Error(error.message);
+  }
+
+  // Fire admin email non-blocking — errors must not roll back the fulfilled state
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (adminEmails.length > 0) {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('fortnite_username')
+      .eq('id', order.user_id)
+      .single();
+    const username = profile?.fortnite_username ?? order.user_id;
+
+    if (action === 'gifted') {
+      sendOrderFulfilledNotificationToAdmin(adminEmails, username, order.skin_name).catch((err) =>
+        console.error('[services/orders] fulfillment email failed', err),
+      );
+    } else {
+      sendOrderRefundedNotificationToAdmin(
+        adminEmails,
+        username,
+        order.skin_name,
+        order.vbucks_cost,
+      ).catch((err) => console.error('[services/orders] refund email failed', err));
+    }
+  }
 }

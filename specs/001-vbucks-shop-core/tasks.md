@@ -135,48 +135,110 @@ and a pending order appears in the order history on `/wallet`.
 
 ---
 
-## Phase 5: User Story 3 — Admin Fulfills Skin Orders (Priority: P3)
+## Phase 5: User Story 3 — Admin Notifications & Friend Request Management (Priority: P3)
 
-**Goal**: An admin can view all pending skin orders and mark each as "gifted"
-(fulfilled) or "refunded" (failed), triggering a buyer notification.
+**Goal**: After a user buys V-Bucks (with their Fortnite username on file), the admin
+sees them in the dashboard and manages the Fortnite friend request lifecycle so the
+platform can later gift skins in-game. Users see their current friend request status
+and understand what they need to do next.
 
-**Independent Test**: With at least one pending order in the system, sign in as admin
-(userId in `ADMIN_USER_IDS`), navigate to `/admin/orders`, mark the order as "gifted",
-and confirm the order status changes and the buyer receives an email notification.
+**Updated checkout pre-condition**: A user must have `fortnite_username` set on their
+profile before `POST /api/checkout` creates a Stripe session. `BuyVBucksSection`
+already renders `FortniteUsernameForm`, but the API must enforce this server-side.
+
+**New DB columns on `profiles`**:
+- `friend_request_status text NOT NULL DEFAULT 'not_sent' CHECK IN ('not_sent','pending','accepted')`
+- `friend_request_accepted_at timestamptz NULLABLE` — set when status transitions to `accepted`
+
+**Independent Test**: Sign in as admin, navigate to `/admin/orders`. Find a user who
+has completed a V-Bucks purchase. Toggle their friend request status through all three
+states and confirm the DB and UI update accordingly.
+
+### Schema & Types
+
+- [x] T054 Write Supabase migration `supabase/migrations/20260505_profiles_friend_request.sql`: `ALTER TABLE profiles ADD COLUMN friend_request_status text NOT NULL DEFAULT 'not_sent' CHECK (friend_request_status IN ('not_sent','pending','accepted')), ADD COLUMN friend_request_accepted_at timestamptz`; add RLS note — only service role may update these columns
+- [x] T055 [P] Update `types/index.ts`: add `export type FriendRequestStatus = 'not_sent' | 'pending' | 'accepted'`; extend `Profile` interface with `friend_request_status: FriendRequestStatus` and `friend_request_accepted_at: string | null`
+
+### Checkout Gate
+
+- [x] T056 Update `POST /api/checkout` in `app/api/checkout/route.ts`: after auth check, fetch profile via `supabaseAdmin`; return `422 { error: 'fortnite_username_required' }` if `profile.fortnite_username` is null; proceed to Stripe session creation only when username is set
 
 ### Tests for User Story 3
 
 > **Write these tests FIRST and ensure they FAIL before implementation**
 
-- [ ] T054 [P] [US3] E2E test: admin fulfillment flow in `__tests__/e2e/admin-fulfillment.spec.ts` — sign in as admin, navigate to `/admin/orders`, mark pending order as gifted, assert status changes; verify non-admin user receives 403; `data-testid="fulfill-btn"`, `data-testid="refund-btn"`
-- [ ] T055 [P] [US3] Unit test for `PATCH /api/admin/orders/[orderId]` in `__tests__/unit/api/admin-orders.test.ts`: 401 unauthenticated, 403 non-admin, 400 invalid status, 404 order not found, 409 order not pending, 200 gifted success, 200 refunded success (with balance refund)
-- [ ] T056 [P] [US3] Unit test for `services/orders.ts` (admin functions) in `__tests__/unit/services/orders-admin.test.ts`: `getPendingOrders` returns all pending, `fulfillOrder` updates status and triggers refund on "refunded"
-- [ ] T057 [P] [US3] Unit test for `services/email.ts` in `__tests__/unit/services/email.test.ts`: `sendFulfillmentEmail` calls Resend with correct recipient; `sendRefundEmail` calls Resend with correct recipient
+- [x] T057 [P] [US3] Unit test for `services/admin.ts` in `__tests__/unit/services/admin.test.ts`: `getRecentVBucksPurchasers` returns purchases joined with profile data; `updateFriendRequestStatus` updates status; sets `friend_request_accepted_at` when transitioning to `accepted`; clears it when transitioning away
+- [x] T058 [P] [US3] Unit test for `PATCH /api/admin/profiles/[userId]/friend-request` in `__tests__/unit/api/admin-friend-request.test.ts`: 401 unauthenticated, 403 non-admin, 400 invalid status value, 404 profile not found, 200 status updated, 200 sets `friend_request_accepted_at` on `accepted` transition
+- [x] T059 [P] [US3] E2E test in `__tests__/e2e/admin-friend-request.spec.ts`: sign in as admin, navigate to `/admin/orders`, find purchaser row, click through all three friend request states and assert badge changes; `data-testid="friend-request-toggle-{userId}"`
 
 ### Implementation for User Story 3
 
-- [ ] T058 [US3] Implement `services/email.ts`: `sendFulfillmentEmail(to: string, skinName: string): Promise<void>` and `sendRefundEmail(to: string, skinName: string, vbucksRefunded: number): Promise<void>` using `resend.emails.send`; log errors server-side, never throw to caller
-- [ ] T059 [US3] Extend `services/orders.ts` with admin functions: `getPendingOrders(): Promise<SkinOrder[]>` — all rows with `status='pending'`; `fulfillOrder(orderId: string, status: 'gifted' | 'refunded'): Promise<void>` — validate order is pending, update status + `resolved_at`, conditionally call `increment_vbucks` for refund, call email service
-- [ ] T060 [US3] Implement `PATCH /api/admin/orders/[orderId]` in `app/api/admin/orders/[orderId]/route.ts`: `auth()` → admin check against `ADMIN_USER_IDS` env var → validate `status` body → call `fulfillOrder` → return `{ ok: true }`
-- [ ] T061 [P] [US3] Create `PendingOrdersTable` server component in `components/admin/PendingOrdersTable.tsx`: accept `orders: SkinOrder[]` prop; render table with buyer userId, skin name, cost, created timestamp, and action buttons
-- [ ] T062 [P] [US3] Create `OrderActionButtons` client component in `components/admin/OrderActionButtons.tsx`: accept `orderId: string` prop; "Mark as Gifted" and "Mark as Refunded" buttons; PATCH `/api/admin/orders/{orderId}`; disable buttons after action; `data-testid="fulfill-btn"` and `data-testid="refund-btn"`
-- [ ] T063 [US3] Implement admin orders page at `app/(admin)/orders/page.tsx`: server component; verify admin server-side (redirect to `/` if not admin); fetch via `getPendingOrders()`; render `<PendingOrdersTable orders={orders} />`
+- [x] T060 [US3] Implement `services/admin.ts`: `getRecentVBucksPurchasers(): Promise<PurchaserWithStatus[]>` — join `purchases` with `profiles` (fortnite_username, friend_request_status, friend_request_accepted_at), ordered by `purchases.created_at DESC`; `updateFriendRequestStatus(userId: string, status: FriendRequestStatus): Promise<void>` — update `profiles` via `supabaseAdmin`; set `friend_request_accepted_at = now()` when `status = 'accepted'`, set `null` otherwise; add `import 'server-only'` guard
+- [x] T061 [US3] Implement `services/email.ts`: `sendVBucksPurchaseNotificationToAdmin(adminEmails: string[], fortniteUsername: string, vbucksAmount: number): Promise<void>` and `sendOrderPlacedNotificationToAdmin(adminEmails: string[], fortniteUsername: string, skinName: string, vbucksCost: number): Promise<void>` — send emails to all admin addresses using `resend.emails.send`; log errors server-side, never throw to caller; add `import 'server-only'` guard
+- [x] T062 [US3] Implement `PATCH /api/admin/profiles/[userId]/friend-request` in `app/api/admin/profiles/[userId]/friend-request/route.ts`: `auth.protect()` → admin check against `ADMIN_USER_IDS` → validate body `status` is a valid `FriendRequestStatus` → call `updateFriendRequestStatus` → return `{ ok: true }`
+- [x] T063 [P] [US3] Create `PurchasersPanel` server component in `app/(admin)/orders/_components/PurchasersPanel.tsx`: accept `purchasers: PurchaserWithStatus[]` prop; render table with Fortnite username, V-Bucks amount, purchase timestamp, and `<FriendRequestToggle>` per row
+- [x] T064 [P] [US3] Create `FriendRequestToggle` client component in `app/(admin)/orders/_components/FriendRequestToggle.tsx`: accept `userId: string` and `initialStatus: FriendRequestStatus` props; three-state toggle buttons (Not Sent / Pending / Accepted); `PATCH /api/admin/profiles/{userId}/friend-request` on change; optimistic UI update; `data-testid="friend-request-toggle-{userId}"`
+- [x] T065 [US3] Update `POST /api/webhooks/stripe` in `app/api/webhooks/stripe/route.ts`: after `increment_vbucks` succeeds, fetch user profile and call `sendVBucksPurchaseNotificationToAdmin` with admin emails from env var `ADMIN_EMAILS` (comma-separated); log email errors but continue webhook success response
+- [x] T066 [US3] Implement admin dashboard page at `app/(admin)/orders/page.tsx`: server component; `auth.protect()` + admin guard (redirect to `/` if not admin); fetch via `getRecentVBucksPurchasers()`; render `<PurchasersPanel>` — pending orders section will be added in Phase 6
+- [x] T067 [P] [US3] Update wallet page at `app/(shop)/wallet/page.tsx` to show friend request status banner: if `not_sent` or `pending` — "We'll send you a Fortnite friend request to `{fortnite_username}`. Accept it to unlock the item shop."; if `accepted` and within 48-hour window — "Friend request accepted! Item shop unlocks in `{N}` hours."; if eligible — show nothing extra; use `data-testid="friend-request-status-banner"`
 
-**Checkpoint**: All three user stories independently functional
+**Checkpoint**: Admin receives emails for V-Bucks purchases; admin can track and manage friend request state per purchaser; users see instructions on wallet page
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 — Item Shop Access Gate & Order Fulfillment (Priority: P4)
+
+**Goal**: The item shop enforces a gate (friend request must be `accepted` AND 48 hours
+must have elapsed). Admin fulfills pending skin orders by gifting them in-game; the
+buyer receives an email notification and can track order status in their profile.
+
+**48-hour gate rule**: `profile.friend_request_status = 'accepted'` AND
+`now() >= profile.friend_request_accepted_at + INTERVAL '48 hours'`.
+
+**Independent Test**: Set a test profile's `friend_request_accepted_at` to 49 hours ago
+and `friend_request_status` to `accepted`. Navigate to `/item-shop` — catalog must be
+accessible. Place an order. Sign in as admin, navigate to `/admin/orders`, and mark
+the order as gifted — buyer receives email and order status updates.
+
+### Tests for User Story 4
+
+> **Write these tests FIRST and ensure they FAIL before implementation**
+
+- [ ] T068 [P] [US4] Unit test for `services/access-gate.ts` in `__tests__/unit/services/access-gate.test.ts`: `no_username` when fortnite_username null; `friend_request_not_accepted` when status is `not_sent` or `pending`; `waiting_period` when accepted < 48 h ago (includes `hoursRemaining`); `eligible` when accepted >= 48 h ago
+- [ ] T069 [P] [US4] Unit test for order placement admin notification in `__tests__/unit/api/orders.test.ts`: `POST /api/orders` success case sends admin email via `sendOrderPlacedNotificationToAdmin`
+- [ ] T070 [P] [US4] Unit test for `services/orders.ts` admin functions in `__tests__/unit/services/orders-admin.test.ts`: `getPendingOrders` returns all `status='pending'` rows joined with `fortnite_username`; `fulfillOrder` with `'gifted'` updates status + `resolved_at` + calls `sendOrderFulfilledNotificationToAdmin`; `fulfillOrder` with `'refunded'` calls `increment_vbucks` + updates status + `resolved_at` + calls `sendOrderRefundedNotificationToAdmin`
+- [ ] T071 [P] [US4] Unit test for `PATCH /api/admin/orders/[orderId]` in `__tests__/unit/api/admin-orders.test.ts`: 401 unauthenticated, 403 non-admin, 400 invalid status, 404 order not found, 409 order not pending, 200 gifted success (admin email sent), 200 refunded success (balance credit + admin email sent)
+- [ ] T072 [P] [US4] E2E test in `__tests__/e2e/admin-fulfillment.spec.ts`: sign in as admin, navigate to `/admin/orders`, see pending order with Fortnite username, mark as gifted, assert status badge changes; verify non-admin receives 403; `data-testid="gift-order-btn"`, `data-testid="refund-order-btn"`
+
+### Implementation for User Story 4
+
+- [ ] T073 [US4] Implement `services/access-gate.ts`: export `canAccessItemShop(profile: Profile): AccessGateResult` where `AccessGateResult = { allowed: boolean; reason: 'no_username' | 'friend_request_not_accepted' | 'waiting_period' | 'eligible'; hoursRemaining?: number }`; add `import 'server-only'` guard
+- [ ] T074 [US4] Update item shop page at `app/(shop)/item-shop/page.tsx`: call `canAccessItemShop(profile)` server-side; if not `eligible`, render a full-page gate message appropriate to the reason (`no_username` → set username prompt; `friend_request_not_accepted` → accept friend request instruction; `waiting_period` → "Item shop unlocks in `{N}` hours"); render catalog only when `eligible`
+- [ ] T075 [P] [US4] Update item shop detail page at `app/(shop)/item-shop/[offerId]/page.tsx`: call `canAccessItemShop(profile)`; redirect to `/item-shop` if not `eligible` (gate message is shown there — no duplicate UI)
+- [ ] T076 [US4] Extend `services/email.ts`: add `sendOrderPlacedNotificationToAdmin(adminEmails: string[], fortniteUsername: string, skinName: string, vbucksCost: number): Promise<void>`, `sendOrderFulfilledNotificationToAdmin(adminEmails: string[], fortniteUsername: string, skinName: string): Promise<void>`, and `sendOrderRefundedNotificationToAdmin(adminEmails: string[], fortniteUsername: string, skinName: string, vbucksRefunded: number): Promise<void>` — send emails to all admin addresses using `resend.emails.send`; log errors server-side, never throw to caller
+- [ ] T077 [US4] Extend `services/orders.ts` with admin functions: `getPendingOrders(): Promise<SkinOrderWithUsername[]>` — join `skin_orders` with `profiles` to include `fortnite_username`; `fulfillOrder(orderId: string, status: 'gifted' | 'refunded'): Promise<void>` — validate order is `pending`, update `status` + `resolved_at`, call `increment_vbucks` for `'refunded'`, call appropriate admin notification email function
+- [ ] T078 [US4] Implement `PATCH /api/admin/orders/[orderId]` in `app/api/admin/orders/[orderId]/route.ts`: `auth.protect()` → admin check → validate `status` body (`'gifted' | 'refunded'`) → call `fulfillOrder` → return `{ ok: true }`
+- [ ] T079 [P] [US4] Create `PendingOrdersTable` server component in `app/(admin)/orders/_components/PendingOrdersTable.tsx`: accept `orders: SkinOrderWithUsername[]` prop; render table with Fortnite username, skin name, V-Bucks cost, created timestamp, and `<OrderActionButtons>` per row
+- [ ] T080 [P] [US4] Create `OrderActionButtons` client component in `app/(admin)/orders/_components/OrderActionButtons.tsx`: accept `orderId: string` prop; "Gift" and "Refund" buttons; `PATCH /api/admin/orders/{orderId}`; disable both after action; `data-testid="gift-order-btn"` and `data-testid="refund-order-btn"`
+- [ ] T081 [US4] Update `POST /api/orders` in `app/api/orders/route.ts`: after order is successfully created, call `sendOrderPlacedNotificationToAdmin` with admin emails from env var `ADMIN_EMAILS` (comma-separated) and order details; log email errors but continue API success response with 201
+- [ ] T082 [US4] Update admin orders page at `app/(admin)/orders/page.tsx`: fetch via `getPendingOrders()`; add pending orders section below purchasers panel; render `<PendingOrdersTable orders={pendingOrders} />`; show `<EmptyState>` when no orders pending
+- [ ] T083 [P] [US4] Add order history section to wallet page at `app/(shop)/wallet/page.tsx`: fetch user's `skin_orders` via `supabaseAdmin` ordered by `created_at DESC`; render list with skin name, V-Bucks cost, status badge (pending / gifted / refunded), and `resolved_at` timestamp when set; `data-testid="order-status-{orderId}"`
+
+**Checkpoint**: Full loop functional — admins receive real-time notifications for V-Bucks purchases and orders; users buy V-Bucks, admin manages friend requests, users buy items once eligible, admin gifts items
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: Shared UI, edge case handling, and final validation
 
-- [ ] T064 [P] Create shared UI components in `components/ui/`: `LoadingSpinner.tsx`, `ErrorMessage.tsx` (accept `message: string`), `EmptyState.tsx` (accept `message: string`) — used by catalog, order history, admin dashboard
-- [ ] T065 [P] Create landing page at `app/page.tsx`: redirect authenticated users to `/wallet`; show sign-in / sign-up links for unauthenticated visitors
-- [ ] T066 [P] Unit test for `lib/vbucks-packs.ts` in `__tests__/unit/lib/vbucks-packs.test.ts`: all four packs present, prices in cents, `getPackById` returns correct pack and undefined for unknown id
-- [ ] T067 [P] E2E test: auth flows in `__tests__/e2e/auth.spec.ts` — sign up new account, sign in, sign out; protected routes redirect unauthenticated users
-- [ ] T068 Audit all interactive elements for `data-testid` attributes — ensure `vbucks-balance`, `buy-pack-{packId}`, `skin-card`, `buy-skin-btn`, `order-status`, `fulfill-btn`, `refund-btn`, `fortnite-username-input`, `fortnite-username-submit` are all present; fix any gaps
-- [ ] T069 Add `try/catch` and loading state reset (`finally` block) to all client components that call API routes (`BuySkinButton`, `BuyVBucksSection`, `FortniteUsernameForm`, `OrderActionButtons`) — test that buttons re-enable after errors
-- [ ] T070 Run quickstart.md validation: follow steps 6–8 end-to-end in development to confirm full purchase + fulfillment flow works; fix any issues found
+- [ ] T084 [P] Create shared UI components in `components/ui/`: `LoadingSpinner.tsx`, `ErrorMessage.tsx` (accept `message: string`), `EmptyState.tsx` (accept `message: string`) — used by catalog, order history, admin dashboard
+- [ ] T085 [P] Create landing page at `app/page.tsx`: redirect authenticated users to `/wallet`; show sign-in / sign-up links for unauthenticated visitors
+- [ ] T086 [P] Unit test for `lib/vbucks-packs.ts` in `__tests__/unit/lib/vbucks-packs.test.ts`: all four packs present, prices in cents, `getPackById` returns correct pack and undefined for unknown id
+- [ ] T087 [P] E2E test: auth flows in `__tests__/e2e/auth.spec.ts` — sign up new account, sign in, sign out; protected routes redirect unauthenticated users
+- [ ] T088 Audit all interactive elements for `data-testid` attributes — ensure `vbucks-balance`, `buy-pack-{packId}`, `buy-skin-btn`, `order-status-{orderId}`, `gift-order-btn`, `refund-order-btn`, `fortnite-username-input`, `fortnite-username-submit`, `friend-request-toggle-{userId}`, `friend-request-status-banner` are all present; fix any gaps
+- [ ] T089 Add `try/catch` and loading state reset (`finally` block) to all client components that call API routes (`BuySkinButton`, `BuyVBucksSection`, `FortniteUsernameForm`, `OrderActionButtons`, `FriendRequestToggle`) — test that buttons re-enable after errors
+- [ ] T090 Run quickstart.md validation: follow steps 6–8 end-to-end in development to confirm full purchase + friend request + fulfillment flow works; verify admin receives emails for vbucks purchases and skin orders; fix any issues found
 
 ---
 
@@ -186,16 +248,18 @@ and confirm the order status changes and the buyer receives an email notificatio
 
 - **Setup (Phase 1)**: No dependencies — start immediately
 - **Foundational (Phase 2)**: Requires Setup — BLOCKS all user stories
-- **US1 (Phase 3)**: Requires Foundational — no dependency on US2/US3
-- **US2 (Phase 4)**: Requires Foundational — no dependency on US1/US3 (but wallet page update T053 logically follows US1's T036)
-- **US3 (Phase 5)**: Requires Foundational + T045/T059 (order service) — no dependency on US1/US2 UI
-- **Polish (Phase 6)**: Requires all user story phases complete
+- **US1 (Phase 3)**: Requires Foundational — no dependency on US2/US3/US4
+- **US2 (Phase 4)**: Requires Foundational — no dependency on US1/US3/US4 (T053 extends wallet page after US1 checkpoint)
+- **US3 (Phase 5)**: Requires Foundational + T054 migration; T056 updates existing checkout route from Phase 3
+- **US4 (Phase 6)**: Requires Phase 5 complete (access gate reads `friend_request_accepted_at`); T075 extends `services/orders.ts` from T045
+- **Polish (Phase 7)**: Requires all user story phases complete
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Can start after Phase 2
 - **US2 (P2)**: Can start after Phase 2; T053 extends wallet page from T036 (add after US1 checkpoint)
-- **US3 (P3)**: Can start after Phase 2; `fulfillOrder` in T059 extends `services/orders.ts` from T045
+- **US3 (P3)**: Requires T054 migration; T056 patches the checkout route from US1
+- **US4 (P4)**: Requires US3 complete (access gate reads `friend_request_accepted_at`); fulfillOrder extends T045
 
 ### Within Each User Story
 
@@ -210,6 +274,8 @@ and confirm the order status changes and the buyer receives an email notificatio
 - All Phase 2 lib/client tasks T009–T013 can run in parallel
 - All Phase 2 migration files T015–T016 can run in parallel with each other (T017 depends on T014)
 - Within each user story, all `[P]`-marked tasks can run in parallel
+- Phase 5 T057–T059 (tests) can all run in parallel; T060–T067 (impl) can run in parallel after tests
+- Phase 6 T068–T072 (tests) can all run in parallel; T073–T083 (impl) can run in parallel after tests
 
 ---
 
@@ -255,15 +321,16 @@ T036: THEN: app/(shop)/wallet/page.tsx (depends on T031–T033)
 1. Setup + Foundational → Infrastructure ready
 2. US1 complete → Users can buy V-Bucks (MVP)
 3. US2 complete → Users can order skins
-4. US3 complete → Admins can fulfill orders (full loop)
-5. Polish → Production-ready
+4. US3 complete → Admin tracks friend requests; users see status
+5. US4 complete → Full loop: access gate enforced, admin gifts items
+6. Polish → Production-ready
 
 ### Parallel Team Strategy
 
 With 3 developers (after Phase 2 complete):
-- Developer A: User Story 1 (payments)
+- Developer A: User Story 1 (payments) + User Story 3 (admin/friend requests)
 - Developer B: User Story 2 (catalog + orders)
-- Developer C: User Story 3 (admin fulfillment)
+- Developer C: User Story 4 (access gate + order fulfillment)
 
 ---
 
@@ -274,5 +341,7 @@ With 3 developers (after Phase 2 complete):
 - Tests MUST fail before implementation begins
 - Always reset loading state in `finally` — test buttons re-enable on error
 - `lib/supabase/admin.ts` MUST only be imported in `app/api/**` — never in components
+- `services/` files MUST start with `import 'server-only'`
 - Money amounts in cents throughout — never floats
+- `friend_request_accepted_at` is always set/cleared atomically with `friend_request_status` — never let them drift
 - Commit after each completed checkpoint
