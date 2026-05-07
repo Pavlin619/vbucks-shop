@@ -11,18 +11,7 @@ interface UseCheckoutResult {
   checkout: () => Promise<void>;
 }
 
-/**
- * Encapsulates the cart-checkout flow: POSTs the current cart to
- * `/api/checkout`, redirects unauthenticated users to sign-in, clears the
- * cart on success, and exposes loading/error state for the UI.
- *
- * Lives next to the cart page because no other route needs it; if a future
- * "buy now" button on a different page needs the same flow it can move up.
- */
-export function useCheckout(
-  items: CartItem[],
-  onSuccess: () => void,
-): UseCheckoutResult {
+export function useCheckout(items: CartItem[]): UseCheckoutResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -49,7 +38,6 @@ export function useCheckout(
       }
 
       const { url } = await res.json();
-      onSuccess();
       window.location.href = url;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Неуспешно плащане');

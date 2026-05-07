@@ -2,6 +2,8 @@ import 'server-only';
 import { stripe } from '@/lib/stripe';
 import { getPackById } from '@/lib/vbucks-packs';
 
+const MAX_QUANTITY_PER_PACK = 10;
+
 export interface CheckoutItemInput {
   packId: string;
   quantity: number;
@@ -40,7 +42,12 @@ export async function createCheckoutSession({
     const pack = item.packId ? getPackById(item.packId) : undefined;
     const quantity = item.quantity;
 
-    if (!pack || !Number.isInteger(quantity) || (quantity ?? 0) < 1) {
+    if (
+      !pack ||
+      !Number.isInteger(quantity) ||
+      (quantity ?? 0) < 1 ||
+      (quantity ?? 0) > MAX_QUANTITY_PER_PACK
+    ) {
       return { ok: false, reason: 'INVALID_PACK', packId: String(item.packId) };
     }
 
@@ -67,7 +74,7 @@ export async function createCheckoutSession({
       client_reference_id: userId,
       line_items: lineItems,
       metadata: { userId, vbucks: String(totalVbucks) },
-      success_url: `${appUrl}/checkout/success`,
+      success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/checkout/cancel`,
     });
 
