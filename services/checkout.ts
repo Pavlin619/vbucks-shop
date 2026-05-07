@@ -1,5 +1,4 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
 import { stripe } from '@/lib/stripe';
 import { getPackById } from '@/lib/vbucks-packs';
 
@@ -18,25 +17,6 @@ interface CreateCheckoutSessionInput {
   userId: string;
   items: unknown;
   appUrl: string;
-}
-
-/**
- * Deterministic key over (userId, sorted cart) so an accidental retry
- * (browser double-click, network jitter) deduplicates against Stripe's
- * 24h idempotency cache instead of opening a second Checkout Session.
- * Exported for unit testing.
- */
-export function buildIdempotencyKey(
-  userId: string,
-  items: CheckoutItemInput[],
-): string {
-  const fingerprint = [...items]
-    .sort((a, b) => a.packId.localeCompare(b.packId))
-    .map((i) => `${i.packId}x${i.quantity}`)
-    .join('|');
-  const hash = createHash('sha256').update(`${userId}|${fingerprint}`).digest('hex');
-  
-  return `co_${hash.slice(0, 32)}`;
 }
 
 export async function createCheckoutSession({
@@ -80,19 +60,16 @@ export async function createCheckoutSession({
   }
 
   try {
-    const session = await stripe.checkout.sessions.create(
-      {
-        mode: 'payment',
-        // Omitting `payment_method_types` lets Stripe surface every
-        // method enabled in the dashboard (card, Link, Apple/Google Pay).
-        client_reference_id: userId,
-        line_items: lineItems,
-        metadata: { userId, vbucks: String(totalVbucks) },
-        success_url: `${appUrl}/checkout/success`,
-        cancel_url: `${appUrl}/checkout/cancel`,
-      },
-      { idempotencyKey: buildIdempotencyKey(userId, validatedItems) },
-    );
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      // Omitting `payment_method_types` lets Stripe surface every
+      // method enabled in the dashboard (card, Link, Apple/Google Pay).
+      client_reference_id: userId,
+      line_items: lineItems,
+      metadata: { userId, vbucks: String(totalVbucks) },
+      success_url: `${appUrl}/checkout/success`,
+      cancel_url: `${appUrl}/checkout/cancel`,
+    });
 
     if (!session.url) {
       console.error('[checkout] Stripe returned a session with no URL', session.id);
