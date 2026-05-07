@@ -10,14 +10,9 @@ import CartLineItem from '@/app/(shop)/cart/_components/CartLineItem';
 import CartSummary from '@/app/(shop)/cart/_components/CartSummary';
 import CheckoutButton from '@/app/(shop)/cart/_components/CheckoutButton';
 
-/**
- * Cart page shell. Pulls cart state from context, delegates checkout to
- * `useCheckout`, and composes the line items / summary / checkout button
- * sub-components.
- */
 export default function CartContent() {
-  const { items, removeItem, clearCart, totalVbucks, totalCents } = useCart();
-  const { loading, error, checkout } = useCheckout(items, clearCart);
+  const { items, removeItem, totalVbucks, totalCents } = useCart();
+  const { loading, error, checkout } = useCheckout(items);
 
   if (items.length === 0) {
     return <EmptyCart />;
