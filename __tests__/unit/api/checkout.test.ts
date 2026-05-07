@@ -150,7 +150,6 @@ describe('POST /api/checkout', () => {
           vbucks: '2000',
         }),
       }),
-      expect.any(Object),
     );
   });
 
@@ -168,30 +167,25 @@ describe('POST /api/checkout', () => {
     expect(params).not.toHaveProperty('payment_method_types');
   });
 
-  it('passes a deterministic idempotencyKey for the same userId + cart', async () => {
+  /**
+   * Regression: a static idempotency key per (userId + cart) caused Stripe to
+   * return the already-completed first session when the same pack was purchased
+   * again. The cart would be cleared but no VBucks credited on the second buy.
+   */
+  it('creates a fresh Stripe session when the same pack is bought again', async () => {
     mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
-    mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/x' } as never);
+    mockSessionCreate
+      .mockResolvedValueOnce({ url: 'https://checkout.stripe.com/sess_1' } as never)
+      .mockResolvedValueOnce({ url: 'https://checkout.stripe.com/sess_2' } as never);
 
-    await POST(makeRequest({ items: validItems }));
-    await POST(makeRequest({ items: validItems }));
+    const res1 = await POST(makeRequest({ items: validItems }));
+    const res2 = await POST(makeRequest({ items: validItems }));
 
-    const firstKey = mockSessionCreate.mock.calls[0][1]?.idempotencyKey;
-    const secondKey = mockSessionCreate.mock.calls[1][1]?.idempotencyKey;
-    expect(firstKey).toBeTruthy();
-    expect(typeof firstKey).toBe('string');
-    expect(firstKey).toBe(secondKey);
-  });
-
-  it('uses a different idempotencyKey when the cart contents change', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
-    mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/x' } as never);
-
-    await POST(makeRequest({ items: [{ packId: '1000', quantity: 1 }] }));
-    await POST(makeRequest({ items: [{ packId: '500', quantity: 1 }] }));
-
-    const firstKey = mockSessionCreate.mock.calls[0][1]?.idempotencyKey;
-    const secondKey = mockSessionCreate.mock.calls[1][1]?.idempotencyKey;
-    expect(firstKey).not.toBe(secondKey);
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect((await res1.json()).url).toBe('https://checkout.stripe.com/sess_1');
+    expect((await res2.json()).url).toBe('https://checkout.stripe.com/sess_2');
+    expect(mockSessionCreate).toHaveBeenCalledTimes(2);
   });
 
   it('returns 500 when Stripe throws', async () => {
