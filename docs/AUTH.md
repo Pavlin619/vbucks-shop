@@ -6,7 +6,10 @@ The Clerk userId is the primary key in the `profiles` table.
 ## Route protection
 - All routes protected by default via [`middleware.ts`](../middleware.ts).
 - Public routes: `/`, `/cart`, `/sign-in`, `/sign-up`, `/api/webhooks/*`.
-- Admin routes (`/admin`, `/api/admin/*`) — when implemented, gate via `assertAdmin(userId)` that checks `userId` against `ADMIN_USER_IDS` (comma-separated Clerk user IDs in env). Not yet implemented; the env var is reserved.
+- Admin routes (`/admin`, `/api/admin/*`) — enforced at two layers:
+  1. **Middleware** (`isAdminRoute` matcher in `middleware.ts`): blocks any session whose `sessionClaims.metadata.role` is not `'admin'` before the route handler runs. Pages redirect to `/`; API routes return `403`.
+  2. **Route handler / Server Component** (defense in depth): call `auth.protect()` and re-check `sessionClaims?.metadata?.role !== 'admin'`.
+  To grant admin access: set `publicMetadata: { role: 'admin' }` on the user in the Clerk Dashboard. The claim is included in the JWT automatically and typed via `types/clerk.d.ts`.
 - Middleware behaviour for unauthenticated callers:
   - **Pages**: redirect to Clerk sign-in (preserves return-to URL).
   - **API routes**: respond `401 { error: 'Unauthorized' }` (we override Clerk's default `404`; nothing in this app needs route obscurity).

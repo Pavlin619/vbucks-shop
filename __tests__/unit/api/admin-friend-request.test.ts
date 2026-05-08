@@ -17,6 +17,9 @@ import { PATCH } from '@/app/api/admin/profiles/[userId]/friend-request/route';
 const mockAuthProtect = vi.mocked(auth.protect);
 const mockUpdateStatus = vi.mocked(updateFriendRequestStatus);
 
+const adminClaims = { sessionClaims: { metadata: { role: 'admin' } } };
+const userClaims = { sessionClaims: { metadata: {} } };
+
 const makeRequest = (body: unknown, targetUserId = 'user_target') =>
   [
     new Request(`http://localhost:3000/api/admin/profiles/${targetUserId}/friend-request`, {
@@ -30,7 +33,6 @@ const makeRequest = (body: unknown, targetUserId = 'user_target') =>
 describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.ADMIN_USER_IDS = 'admin_user_1,admin_user_2';
   });
 
   it('rejects unauthenticated requests via auth.protect', async () => {
@@ -42,7 +44,7 @@ describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   });
 
   it('returns 403 when the caller is not an admin', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'regular_user' } as never);
+    mockAuthProtect.mockResolvedValue(userClaims as never);
 
     const [req, ctx] = makeRequest({ status: 'pending' });
     const res = await PATCH(req, ctx);
@@ -52,7 +54,7 @@ describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   });
 
   it('returns 400 for an invalid status value', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'admin_user_1' } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
 
     const [req, ctx] = makeRequest({ status: 'invalid_status' });
     const res = await PATCH(req, ctx);
@@ -62,7 +64,7 @@ describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   });
 
   it('returns 400 when the body is not valid JSON', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'admin_user_1' } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
 
     const [req, ctx] = [
       new Request('http://localhost:3000/api/admin/profiles/user_target/friend-request', {
@@ -79,7 +81,7 @@ describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   });
 
   it('returns 404 when updateFriendRequestStatus throws (profile not found)', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'admin_user_1' } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockUpdateStatus.mockRejectedValue(new Error('Profile not found'));
 
     const [req, ctx] = makeRequest({ status: 'pending' });
@@ -89,7 +91,7 @@ describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   });
 
   it('returns 200 when status is updated successfully', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'admin_user_1' } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockUpdateStatus.mockResolvedValue(undefined);
 
     const [req, ctx] = makeRequest({ status: 'pending' });
@@ -102,7 +104,7 @@ describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   });
 
   it('returns 200 and calls updateFriendRequestStatus with accepted', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'admin_user_2' } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockUpdateStatus.mockResolvedValue(undefined);
 
     const [req, ctx] = makeRequest({ status: 'accepted' });
@@ -113,7 +115,7 @@ describe('PATCH /api/admin/profiles/[userId]/friend-request', () => {
   });
 
   it('accepts not_sent as a valid status', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'admin_user_1' } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockUpdateStatus.mockResolvedValue(undefined);
 
     const [req, ctx] = makeRequest({ status: 'not_sent' });

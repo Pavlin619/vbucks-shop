@@ -14,6 +14,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/webhooks/(.*)',
 ]);
 
+const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin/(.*)']);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
 /**
@@ -34,14 +35,19 @@ const isApiRoute = createRouteMatcher(['/api/(.*)']);
 export default clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return;
 
-  const { userId } = await auth();
-  if (userId) return;
+  const { userId, sessionClaims } = await auth();
 
-  if (isApiRoute(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!userId) {
+    return isApiRoute(req)
+      ? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      : (await auth()).redirectToSignIn();
   }
 
-  return (await auth()).redirectToSignIn();
+  if (isAdminRoute(req) && sessionClaims?.metadata?.role !== 'admin') {
+    return isApiRoute(req)
+      ? NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      : NextResponse.redirect(new URL('/', req.url));
+  }
 });
 
 export const config = {
