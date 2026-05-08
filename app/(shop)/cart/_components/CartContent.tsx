@@ -8,9 +8,14 @@ import { useCheckout } from '@/app/(shop)/cart/_lib/use-checkout';
 import EmptyCart from '@/app/(shop)/cart/_components/EmptyCart';
 import CartLineItem from '@/app/(shop)/cart/_components/CartLineItem';
 import CartSummary from '@/app/(shop)/cart/_components/CartSummary';
-import CheckoutButton from '@/app/(shop)/cart/_components/CheckoutButton';
+import PurchaseSteps from '@/app/(shop)/cart/_components/PurchaseSteps';
 
-export default function CartContent() {
+interface CartContentProps {
+  isAuthenticated: boolean;
+  fortniteUsername: string | null;
+}
+
+export default function CartContent({ isAuthenticated, fortniteUsername }: CartContentProps) {
   const { items, removeItem, totalVbucks, totalCents } = useCart();
   const { loading, error, checkout } = useCheckout(items);
 
@@ -48,7 +53,13 @@ export default function CartContent() {
 
         <CartSummary totalVbucks={totalVbucks} totalCents={totalCents} />
 
-        <CheckoutButton loading={loading} error={error} onCheckout={checkout} />
+        <PurchaseSteps
+          isAuthenticated={isAuthenticated}
+          fortniteUsername={fortniteUsername}
+          onCheckout={checkout}
+          checkoutLoading={loading}
+          checkoutError={error}
+        />
       </div>
     </main>
   );

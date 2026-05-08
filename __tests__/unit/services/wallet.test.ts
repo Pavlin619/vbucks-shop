@@ -7,7 +7,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 }));
 
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { syncProfile, getProfile } from '@/services/wallet';
+import { syncProfile, getProfile, updateFortniteUsername } from '@/services/wallet';
 
 const mockFrom = vi.mocked(supabaseAdmin.from);
 
@@ -92,6 +92,33 @@ describe('services/wallet', () => {
       await getProfile('user_123');
 
       expect(mockUpsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateFortniteUsername', () => {
+    it('updates the fortnite_username column for the given user', async () => {
+      const mockEq = vi.fn().mockResolvedValue({ error: null });
+      mockFrom.mockReturnValue({
+        update: vi.fn().mockReturnValue({ eq: mockEq }),
+      } as never);
+
+      await expect(
+        updateFortniteUsername('user_123', 'NinjaPlayer'),
+      ).resolves.toBeUndefined();
+      expect(mockFrom).toHaveBeenCalledWith('profiles');
+      expect(mockEq).toHaveBeenCalledWith('id', 'user_123');
+    });
+
+    it('throws when the database returns an error', async () => {
+      mockFrom.mockReturnValue({
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: { message: 'update failed' } }),
+        }),
+      } as never);
+
+      await expect(
+        updateFortniteUsername('user_123', 'NinjaPlayer'),
+      ).rejects.toThrow('update failed');
     });
   });
 });

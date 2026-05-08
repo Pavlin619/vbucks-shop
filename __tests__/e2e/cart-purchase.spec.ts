@@ -87,13 +87,21 @@ test.describe('Cart page actions', () => {
     await expect(page.getByTestId('cart-total')).toContainText('€2,99');
   });
 
-  test('checkout button redirects unauthenticated user to sign-in', async ({ page }) => {
+  test('unauthenticated user sees sign-in step and checkout button is disabled', async ({ page }) => {
     await page.goto('/');
     await page.getByTestId('buy-pack-1000').click();
     await page.getByTestId('go-to-cart').click();
-    await page.getByTestId('checkout-btn').click();
-    // Either the API returns 401 → router.push('/sign-in')
-    // or the middleware/auth redirects to Clerk's sign-in page
+    // Step 1 of the purchase process is active — sign-in link visible
+    await expect(page.getByTestId('step-signin-link')).toBeVisible();
+    // Checkout button is disabled until auth + username are provided
+    await expect(page.getByTestId('checkout-btn')).toBeDisabled();
+  });
+
+  test('unauthenticated user can navigate to sign-in from the purchase steps', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('buy-pack-1000').click();
+    await page.getByTestId('go-to-cart').click();
+    await page.getByTestId('step-signin-link').click();
     await page.waitForURL(/sign-in/, { timeout: 15_000 });
   });
 });
