@@ -93,12 +93,12 @@ export default function PurchaseSteps({
       <Step number={1} status={step1Status} title="Влез в акаунта си" isLast={false}>
         {step1Status === 'active' && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button as="link" href="/sign-in" size="sm" data-testid="step-signin-link">
+            <Button as="link" href="/sign-in?redirect_url=/cart" size="sm" data-testid="step-signin-link">
               Вход
             </Button>
             <Button
               as="link"
-              href="/sign-up"
+              href="/sign-up?redirect_url=/cart"
               size="sm"
               variant="secondary"
               data-testid="step-signup-link"

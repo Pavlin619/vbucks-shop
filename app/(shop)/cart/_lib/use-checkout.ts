@@ -28,7 +28,7 @@ export function useCheckout(items: CartItem[]): UseCheckoutResult {
       });
 
       if (res.status === 401) {
-        router.push('/sign-in');
+        router.push('/sign-in?redirect_url=/cart');
         return;
       }
 
