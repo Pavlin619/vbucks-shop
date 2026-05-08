@@ -19,6 +19,15 @@ export async function updatePhoneNumber(userId: string, phoneNumber: string | nu
   if (error) throw new Error(error.message);
 }
 
+export async function updateFortniteUsername(userId: string, username: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ fortnite_username: username })
+    .eq('id', userId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function getProfile(userId: string): Promise<Profile> {
   const { data, error } = await supabaseAdmin
     .from('profiles')
