@@ -14,21 +14,14 @@ export const metadata = {
 
 const VALID_PAGE_SIZES = [10, 20, 50] as const;
 
-function getAdminUserIds(): string[] {
-  return (process.env.ADMIN_USER_IDS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 export default async function AdminOrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{ page?: string; pageSize?: string }>;
 }) {
-  const { userId } = await auth.protect();
+  const { sessionClaims } = await auth.protect();
 
-  if (!getAdminUserIds().includes(userId)) {
+  if (sessionClaims?.metadata?.role !== 'admin') {
     redirect('/');
   }
 

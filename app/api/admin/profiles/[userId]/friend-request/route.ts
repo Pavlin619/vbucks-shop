@@ -5,20 +5,13 @@ import type { FriendRequestStatus } from '@/types';
 
 const VALID_STATUSES: readonly FriendRequestStatus[] = ['not_sent', 'pending', 'accepted'];
 
-function getAdminUserIds(): string[] {
-  return (process.env.ADMIN_USER_IDS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const { userId: actorId } = await auth.protect();
+  const { sessionClaims } = await auth.protect();
 
-  if (!getAdminUserIds().includes(actorId)) {
+  if (sessionClaims?.metadata?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
