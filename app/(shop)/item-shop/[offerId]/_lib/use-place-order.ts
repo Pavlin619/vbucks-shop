@@ -50,7 +50,7 @@ export function usePlaceOrder(skinId: string): UsePlaceOrderResult {
       });
       
       if (res.status === 401) {
-        router.push('/sign-in');
+        router.push(`/sign-in?redirect_url=${encodeURIComponent(window.location.pathname)}`);
         return;
       }
 
