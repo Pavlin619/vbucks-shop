@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ShoppingCart, Zap, Menu, X, LogOut } from 'lucide-react';
-import { useClerk } from '@clerk/nextjs';
+import { useClerk, useUser } from '@clerk/nextjs';
 import { useCart } from '@/contexts/CartContext';
 import Button from '@/components/ui/Button';
 
@@ -19,6 +19,7 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { totalItems } = useCart();
   const { signOut } = useClerk();
+  const { isSignedIn } = useUser();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -58,14 +59,24 @@ export default function Header() {
             </span>
           </Button>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => signOut({ redirectUrl: '/sign-in' })}
-            aria-label="Sign out"
-          >
-            <LogOut className="w-4 h-4" />
-          </Button>
+          {isSignedIn ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => signOut({ redirectUrl: '/' })}
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button
+              as="link"
+              href="/sign-in"
+              size="sm"
+            >
+              Sign In
+            </Button>
+          )}
 
           <button
             className="md:hidden p-2 rounded-lg text-brand-text transition-colors hover:bg-white/10"
