@@ -5,6 +5,7 @@ export interface PurchaserWithStatus {
   purchase_id: string;
   user_id: string;
   fortnite_username: string | null;
+  phone_number: string | null;
   vbucks_amount: number;
   amount_cents: number;
   purchased_at: string;

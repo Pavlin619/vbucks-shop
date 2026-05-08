@@ -59,6 +59,7 @@ const RAVENPOOL_ENTRY: ShopEntry = {
 const profileWith = (overrides: Partial<Profile>): Profile => ({
   id: 'user_abc',
   fortnite_username: 'NinjaPlayer123',
+  phone_number: null,
   vbucks_balance: 5000,
   friend_request_status: 'accepted',
   friend_request_accepted_at: '2026-04-17T00:00:00Z',

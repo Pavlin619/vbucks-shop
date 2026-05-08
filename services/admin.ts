@@ -31,7 +31,7 @@ export async function getRecentVBucksPurchasers({
 
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from('profiles')
-    .select('id, fortnite_username, friend_request_status, friend_request_accepted_at')
+    .select('id, fortnite_username, phone_number, friend_request_status, friend_request_accepted_at')
     .in('id', userIds);
 
   if (profilesError) {
@@ -44,6 +44,7 @@ export async function getRecentVBucksPurchasers({
       (p: {
         id: string;
         fortnite_username: string | null;
+        phone_number: string | null;
         friend_request_status: FriendRequestStatus;
         friend_request_accepted_at: string | null;
       }) => [p.id, p],
@@ -63,6 +64,7 @@ export async function getRecentVBucksPurchasers({
         purchase_id: purchase.id,
         user_id: purchase.user_id,
         fortnite_username: profile?.fortnite_username ?? null,
+        phone_number: profile?.phone_number ?? null,
         vbucks_amount: purchase.vbucks_amount,
         amount_cents: purchase.amount_cents,
         purchased_at: purchase.created_at,
