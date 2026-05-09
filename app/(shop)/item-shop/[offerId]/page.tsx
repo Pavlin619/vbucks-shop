@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import SkinHero from '@/app/(shop)/item-shop/[offerId]/_components/SkinHero';
 import SkinInfoCard from '@/app/(shop)/item-shop/[offerId]/_components/SkinInfoCard';
 import BundleContents from '@/app/(shop)/item-shop/[offerId]/_components/BundleContents';
 import BuyFlow from '@/app/(shop)/item-shop/[offerId]/_components/BuyFlow';
+import ItemShopAccessGate from '@/app/(shop)/item-shop/_components/ItemShopAccessGate';
 import { getProfile } from '@/services/wallet';
 import { fetchShopEntries } from '@/services/skins';
+import { canAccessItemShop } from '@/services/access-gate';
 
 interface SkinDetailPageProps {
   params: Promise<{ offerId: string }>;
@@ -22,24 +24,16 @@ export const metadata = {
 };
 
 export default async function SkinDetailPage({ params }: SkinDetailPageProps) {
-  // Middleware already redirects unauthenticated visitors. The call here
-  // is defence-in-depth and narrows `userId` to a non-null string.
-  const { userId } = await auth.protect();
+  // Optional auth — detail page is publicly viewable; buying requires eligibility.
+  const { userId } = await auth();
 
   const { offerId: rawOfferId } = await params;
   const offerId = decodeURIComponent(rawOfferId);
 
-  const [profile, entries] = await Promise.all([
-    getProfile(userId),
-    fetchShopEntries(),
-  ]);
+  const profile = userId ? await getProfile(userId) : null;
+  const gate = canAccessItemShop(profile);
 
-  // No Fortnite username yet → bounce back to the catalog gate. Keeps
-  // the username form in a single place.
-  if (!profile.fortnite_username || profile.fortnite_username.trim() === '') {
-    redirect('/item-shop');
-  }
-
+  const entries = await fetchShopEntries();
   const entry = entries.find((e) => e.offerId === offerId);
   if (!entry) {
     notFound();
@@ -50,8 +44,7 @@ export default async function SkinDetailPage({ params }: SkinDetailPageProps) {
       <Header />
       <main className="min-h-screen pt-28 pb-16 px-4 bg-brand-dark">
         <div className="max-w-6xl mx-auto">
-          {/* Breadcrumb — back to catalog + tiny label so the user always
-              knows what surface they're on. */}
+          {/* Breadcrumb */}
           <div className="flex items-center gap-3 mb-6">
             <Link
               href="/item-shop"
@@ -67,9 +60,6 @@ export default async function SkinDetailPage({ params }: SkinDetailPageProps) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-8 items-start">
-            {/* LEFT column — title + stacked info cards. The title sits
-                above the cards so it can stretch full-width without
-                getting trapped inside the description card. */}
             <div className="space-y-4 order-2 lg:order-1">
               <h1
                 data-testid="skin-detail-name"
@@ -80,19 +70,25 @@ export default async function SkinDetailPage({ params }: SkinDetailPageProps) {
 
               <SkinInfoCard entry={entry} />
 
-              <BuyFlow
-                skinId={entry.offerId}
-                vbucksCost={entry.vbucks_cost}
-                regularPrice={entry.regular_price}
-                userBalance={profile.vbucks_balance}
-              />
+              {gate.allowed ? (
+                <BuyFlow
+                  skinId={entry.offerId}
+                  vbucksCost={entry.vbucks_cost}
+                  regularPrice={entry.regular_price}
+                  userBalance={profile!.vbucks_balance}
+                />
+              ) : (
+                <ItemShopAccessGate gate={gate} />
+              )}
 
               <BundleContents items={entry.bundle_items} />
 
-              <p className="text-xs text-brand-muted leading-relaxed px-1">
-                Скинът ще бъде подарен ръчно в играта от администратор на
-                акаунта <strong>{profile.fortnite_username}</strong>.
-              </p>
+              {gate.allowed && profile?.fortnite_username && (
+                <p className="text-xs text-brand-muted leading-relaxed px-1">
+                  Скинът ще бъде подарен ръчно в играта от администратор на
+                  акаунта <strong>{profile.fortnite_username}</strong>.
+                </p>
+              )}
             </div>
 
             {/* RIGHT column — sticky hero artwork. */}

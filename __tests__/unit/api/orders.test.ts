@@ -16,10 +16,12 @@ vi.mock('@/services/email', () => ({
 
 import { auth } from '@clerk/nextjs/server';
 import { createOrder } from '@/services/orders';
+import { sendOrderPlacedNotificationToAdmin } from '@/services/email';
 import { POST } from '@/app/api/orders/route';
 
 const mockAuthProtect = vi.mocked(auth.protect);
 const mockCreateOrder = vi.mocked(createOrder);
+const mockSendAdminEmail = vi.mocked(sendOrderPlacedNotificationToAdmin);
 
 const VALID_OFFER_ID =
   'v2:/664253e72bac6aa6df0d666893014d2a30e5f519ca2c5f2af5973f9222ef0d3f';
@@ -81,6 +83,17 @@ describe('POST /api/orders', () => {
 
     expect(res.status).toBe(400);
     expect(mockCreateOrder).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when the access gate blocks the order (friend request pending or waiting period)', async () => {
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockCreateOrder.mockResolvedValue({ ok: false, reason: 'ACCESS_GATE_BLOCKED' });
+
+    const res = await POST(makeRequest({ skinId: VALID_OFFER_ID }));
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Item Shop access requirements not met' });
   });
 
   it('returns 422 when the user has no Fortnite username', async () => {
@@ -168,5 +181,50 @@ describe('POST /api/orders', () => {
     await POST(makeRequest({ skinId: `  ${VALID_OFFER_ID}  ` }));
 
     expect(mockCreateOrder).toHaveBeenCalledWith('user_abc', VALID_OFFER_ID);
+  });
+
+  it('fires admin email notification on successful order', async () => {
+    vi.stubEnv('ADMIN_EMAILS', 'admin@example.com,ops@example.com');
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockCreateOrder.mockResolvedValue({
+      ok: true,
+      orderId: 'order_uuid',
+      skinName: 'Ravenpool',
+      vbucksCost: 1500,
+      remainingBalance: 3500,
+    });
+
+    await POST(makeRequest({ skinId: VALID_OFFER_ID }));
+
+    // Allow the fire-and-forget promise to settle
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockSendAdminEmail).toHaveBeenCalledWith(
+      ['admin@example.com', 'ops@example.com'],
+      'user_abc',
+      'Ravenpool',
+      1500,
+    );
+
+    vi.unstubAllEnvs();
+  });
+
+  it('does not fire admin email when ADMIN_EMAILS is empty', async () => {
+    vi.stubEnv('ADMIN_EMAILS', '');
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockCreateOrder.mockResolvedValue({
+      ok: true,
+      orderId: 'order_uuid',
+      skinName: 'Ravenpool',
+      vbucksCost: 1500,
+      remainingBalance: 3500,
+    });
+
+    await POST(makeRequest({ skinId: VALID_OFFER_ID }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockSendAdminEmail).not.toHaveBeenCalled();
+
+    vi.unstubAllEnvs();
   });
 });

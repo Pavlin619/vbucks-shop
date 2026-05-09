@@ -124,7 +124,9 @@ export default function PurchaseSteps({
         {(step2Status === 'active' || step2Status === 'locked') && (
           <p className="mt-2 text-sm text-brand-muted leading-relaxed">
             Въведи своето Fortnite потребителско, за да можем да ти изпратим покана за
-            приятелство. Приеми поканата и изчакай{' '}
+            приятелство. Покана ще бъде изпратена до твоя акаунт в рамките на{' '}
+            <strong className="text-brand-text">30 минути</strong>.
+            Приеми поканата и изчакай{' '}
             <strong className="text-brand-text">48 часа</strong>, след което ще можеш да
             купуваш скинове от Item Shop.
           </p>
