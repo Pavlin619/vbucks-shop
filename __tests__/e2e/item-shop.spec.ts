@@ -1,49 +1,80 @@
 import { test, expect } from '@playwright/test';
 
-// E2E tests covering the public surface of the /item-shop page and its API.
-// Authenticated paths (catalog rendering, username gate) require a Clerk
-// test session helper that doesn't yet exist in the repo and will be added
-// alongside the skin-purchase flow.
+// E2E tests covering the public surface of the /item-shop page.
+// The catalog is now publicly accessible — unauthenticated visitors can browse
+// but are shown a requirements banner and cannot buy.
 
-test.describe('/item-shop — public surface', () => {
+test.describe('/item-shop — unauthenticated visitor', () => {
   test.beforeEach(async ({ context }) => {
     await context.clearCookies();
     await context.addInitScript(() => window.localStorage.clear());
   });
 
-  test('unauthenticated visitor is redirected to sign-in', async ({ page }) => {
+  test('unauthenticated visitor can see the item shop catalog', async ({ page }) => {
     await page.goto('/item-shop');
-    await page.waitForURL(/sign-in/, { timeout: 15_000 });
+    // Should NOT be redirected to sign-in
+    await expect(page).not.toHaveURL(/sign-in/);
+    await expect(page).toHaveURL('/item-shop');
   });
 
-  test('GET /api/skins is auth-protected', async ({ request }) => {
+  test('unauthenticated visitor sees the requirements banner', async ({ page }) => {
+    await page.goto('/item-shop');
+    await expect(page.getByTestId('item-shop-access-gate')).toBeVisible();
+  });
+
+  test('unauthenticated visitor can navigate to a skin detail page', async ({ page }) => {
+    await page.goto('/item-shop');
+    const firstCard = page.getByTestId('skin-card').first();
+    // If the API returned any items we can navigate into one
+    const count = await firstCard.count();
+    if (count > 0) {
+      await firstCard.click();
+      await expect(page).toHaveURL(/\/item-shop\//);
+      await expect(page).not.toHaveURL(/sign-in/);
+    }
+  });
+
+  test('unauthenticated visitor sees access gate instead of buy button on detail page', async ({
+    page,
+  }) => {
+    await page.goto('/item-shop');
+    const firstCard = page.getByTestId('skin-card').first();
+    const count = await firstCard.count();
+    if (count > 0) {
+      await firstCard.click();
+      await expect(page.getByTestId('item-shop-access-gate')).toBeVisible();
+      await expect(page.getByTestId('buy-skin-btn')).not.toBeVisible();
+    }
+  });
+
+  test('GET /api/skins is still auth-protected', async ({ request }) => {
     const res = await request.get('/api/skins');
-    // Middleware returns 401 for unauthenticated API requests
-    // (`middleware.ts`). A 3xx is also acceptable for transport-level
-    // redirects (e.g. middleware future-proofing).
     expect([401, 302, 307, 308]).toContain(res.status());
   });
 });
 
 test.describe('/item-shop — authenticated rendering', () => {
   // These specs require a Clerk-authenticated test session helper which is not
-  // yet implemented. They are intentionally skipped so the file documents the
-  // intended coverage without producing flaky failures. Re-enable once an
-  // E2E auth helper exists (planned alongside the skin-purchase flow).
+  // yet implemented. Re-enable once an E2E auth helper exists.
 
-  test.skip('user without fortnite_username is blocked from /item-shop', async () => {
+  test.skip('user without fortnite_username sees the requirements banner', async () => {
     // Given: a signed-in user whose profile.fortnite_username is null
     // When : they navigate to /item-shop
-    // Then : they see the "Set your Fortnite username" gate and no skin cards
-    //        (data-testid="fortnite-username-gate"), and no data-testid="skin-card"
+    // Then : they see the item-shop-access-gate (data-testid="item-shop-access-gate")
+    //        and the catalog tiles are still visible
   });
 
-  test.skip('user with fortnite_username sees the sectioned shop catalog', async () => {
-    // Given: a signed-in user with a fortnite_username set and the external
-    //        Fortnite API reachable (or a populated server cache)
+  test.skip('user with accepted friend request waiting < 48 h sees waiting banner', async () => {
+    // Given: a signed-in user with fortnite_username set, friend_request_status='accepted',
+    //        friend_request_accepted_at = 10 h ago
     // When : they navigate to /item-shop
-    // Then : at least one data-testid="shop-section" is visible and contains
-    //        one or more data-testid="skin-card" tiles, each with a name,
-    //        image, and V-Bucks cost.
+    // Then : they see the item-shop-access-gate with the hoursRemaining figure
+  });
+
+  test.skip('eligible user sees catalog without any banner', async () => {
+    // Given: a signed-in user with all prerequisites met (accepted >= 48 h ago)
+    // When : they navigate to /item-shop
+    // Then : no data-testid="item-shop-access-gate" is visible
+    //        and at least one data-testid="skin-card" tile is shown
   });
 });

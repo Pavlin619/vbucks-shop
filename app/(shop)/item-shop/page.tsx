@@ -2,9 +2,10 @@ import { auth } from '@clerk/nextjs/server';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ShopGrid from '@/app/(shop)/item-shop/_components/ShopGrid';
-import FortniteUsernameGate from '@/app/(shop)/item-shop/_components/FortniteUsernameGate';
+import ItemShopAccessGate from '@/app/(shop)/item-shop/_components/ItemShopAccessGate';
 import { getProfile } from '@/services/wallet';
 import { fetchShopEntries } from '@/services/skins';
+import { canAccessItemShop } from '@/services/access-gate';
 
 export const metadata = {
   title: 'Item Shop · VBucks Shop',
@@ -12,26 +13,11 @@ export const metadata = {
 };
 
 export default async function ItemShopPage() {
-  // Middleware already redirects unauthenticated visitors. The call here
-  // is defence-in-depth and narrows `userId` to a non-null string.
-  const { userId } = await auth.protect();
+  // Optional auth — item shop is publicly browsable.
+  const { userId } = await auth();
 
-  const profile = await getProfile(userId);
-  const fortniteUsername = profile.fortnite_username?.trim() ?? '';
-
-  if (!fortniteUsername) {
-    return (
-      <>
-        <Header />
-        <main className="min-h-screen pt-28 pb-16 px-4 bg-brand-dark">
-          <div className="max-w-2xl mx-auto">
-            <FortniteUsernameGate />
-          </div>
-        </main>
-        <Footer />
-      </>
-    );
-  }
+  const profile = userId ? await getProfile(userId) : null;
+  const gate = canAccessItemShop(profile);
 
   const entries = await fetchShopEntries();
 
@@ -49,6 +35,8 @@ export default async function ItemShopPage() {
               и я заявете с вашите V-Bucks — администратор ще ви я подари в играта.
             </p>
           </div>
+
+          {!gate.allowed && <ItemShopAccessGate gate={gate} className="mb-8" />}
 
           <ShopGrid entries={entries} />
         </div>

@@ -1,6 +1,7 @@
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getProfile } from '@/services/wallet';
+import { canAccessItemShop } from '@/services/access-gate';
 import { fetchShopEntries } from '@/services/skins';
 import {
   sendOrderFulfilledNotificationToAdmin,
@@ -22,6 +23,7 @@ export type CreateOrderResult =
       remainingBalance: number;
     }
   | { ok: false; reason: 'USERNAME_NOT_SET' }
+  | { ok: false; reason: 'ACCESS_GATE_BLOCKED' }
   | { ok: false; reason: 'SKIN_NOT_FOUND' }
   | {
       ok: false;
@@ -40,7 +42,8 @@ const CHECK_VIOLATION_CODE = '23514';
  * Place a skin order on behalf of a user.
  *
  * Validation order (auth-first, validate-second, mutate-third):
- *   1. Read profile — confirm a Fortnite username is linked.
+ *   1. Read profile — run the full access gate (username set, friend
+ *      request accepted, 48-hour waiting period elapsed).
  *   2. Look up the skin in the live shop catalog.
  *   3. Sanity-check the buyer's balance against the shop price.
  *   4. Call the atomic `buy_skin` RPC, which deducts the balance and
@@ -56,9 +59,13 @@ export async function createOrder(
   offerId: string,
 ): Promise<CreateOrderResult> {
   const profile = await getProfile(userId);
+  const gate = canAccessItemShop(profile);
 
-  if (!profile.fortnite_username || profile.fortnite_username.trim() === '') {
-    return { ok: false, reason: 'USERNAME_NOT_SET' };
+  if (!gate.allowed) {
+    if (gate.reason === 'no_username') {
+      return { ok: false, reason: 'USERNAME_NOT_SET' };
+    }
+    return { ok: false, reason: 'ACCESS_GATE_BLOCKED' };
   }
 
   const entries = await fetchShopEntries();

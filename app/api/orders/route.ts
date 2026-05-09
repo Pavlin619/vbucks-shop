@@ -55,6 +55,11 @@ export async function POST(req: Request) {
         { error: 'Fortnite username not set' },
         { status: 422 },
       );
+    case 'ACCESS_GATE_BLOCKED':
+      return NextResponse.json(
+        { error: 'Item Shop access requirements not met' },
+        { status: 403 },
+      );
     case 'SKIN_NOT_FOUND':
       return NextResponse.json(
         { error: 'Skin not found in catalog' },
