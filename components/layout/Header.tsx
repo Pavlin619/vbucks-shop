@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ShoppingCart, Zap, Menu, X, LogOut } from 'lucide-react';
-import { useClerk, useUser } from '@clerk/nextjs';
+import { ShoppingCart, Zap, Menu, X, CircleUser } from 'lucide-react';
+import { useUser } from '@clerk/nextjs';
 import { useCart } from '@/contexts/CartContext';
 import Button from '@/components/ui/Button';
 
@@ -18,7 +18,6 @@ const NAV_LINKS = [
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { totalItems } = useCart();
-  const { signOut } = useClerk();
   const { isSignedIn } = useUser();
 
   return (
@@ -61,12 +60,13 @@ export default function Header() {
 
           {isSignedIn ? (
             <Button
+              as="link"
+              href="/profile"
               variant="secondary"
               size="sm"
-              onClick={() => signOut({ redirectUrl: '/' })}
-              aria-label="Sign out"
+              aria-label="Профил"
             >
-              <LogOut className="w-4 h-4" />
+              <CircleUser className="w-4 h-4" />
             </Button>
           ) : (
             <Button

@@ -17,6 +17,18 @@ async function sendToAdmins(
   }
 }
 
+export async function sendFriendRequestNeededNotificationToAdmin(
+  adminEmails: string[],
+  fortniteUsername: string,
+): Promise<void> {
+  await sendToAdmins(
+    adminEmails,
+    `[VBucks Shop] Friend request needed — ${fortniteUsername}`,
+    `<p>User <strong>${fortniteUsername}</strong> has set their Fortnite username and is waiting for a friend request.</p>
+     <p>Please open Fortnite and send them a friend request so they can start purchasing skins.</p>`,
+  );
+}
+
 export async function sendVBucksPurchaseNotificationToAdmin(
   adminEmails: string[],
   fortniteUsername: string,

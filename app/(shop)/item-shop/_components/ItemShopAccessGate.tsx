@@ -67,7 +67,7 @@ function GateContent({ gate }: Pick<ItemShopAccessGateProps, 'gate'>) {
             За да поръчате скин, трябва да свържете Fortnite акаунта си от профила си.
           </p>
         </div>
-        <Button as="link" href="/wallet" size="sm">
+        <Button as="link" href="/profile?section=fortnite" size="sm">
           Към профила
         </Button>
       </div>
