@@ -7,7 +7,7 @@ import {
   sendOrderFulfilledNotificationToAdmin,
   sendOrderRefundedNotificationToAdmin,
 } from '@/services/email';
-import type { SkinOrderWithUsername } from '@/types';
+import type { SkinOrder, SkinOrderWithUsername } from '@/types';
 
 /**
  * Outcome of a `createOrder` call. The discriminated `ok` flag lets the
@@ -116,6 +116,20 @@ export async function createOrder(
     vbucksCost: entry.vbucks_cost,
     remainingBalance: profile.vbucks_balance - entry.vbucks_cost,
   };
+}
+
+export async function getAllOrders(userId: string): Promise<SkinOrder[]> {
+  const { data, error } = await supabaseAdmin
+    .from('skin_orders')
+    .select('id, user_id, skin_id, skin_name, vbucks_cost, status, created_at, resolved_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[services/orders] getAllOrders failed', error.message);
+    return [];
+  }
+  return (data ?? []) as SkinOrder[];
 }
 
 export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {

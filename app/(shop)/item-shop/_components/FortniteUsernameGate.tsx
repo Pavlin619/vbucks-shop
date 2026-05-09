@@ -2,24 +2,11 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
 interface FortniteUsernameGateProps {
-  /**
-   * Where the "set my username" CTA points. Defaults to `/wallet` because
-   * that's where the username form lives — pages can override if they ever
-   * surface the gate from a different context.
-   */
   ctaHref?: string;
 }
 
-/**
- * Placeholder shown to users who are signed in but haven't yet linked a
- * Fortnite username to their profile. Shop pages render this in place of
- * their normal content until the user fills in the username.
- *
- * Pure presentational — the gating decision happens server-side in the
- * page that renders this component.
- */
 export default function FortniteUsernameGate({
-  ctaHref = '/wallet',
+  ctaHref = '/profile?section=fortnite',
 }: FortniteUsernameGateProps) {
   return (
     <Card
