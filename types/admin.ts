@@ -6,6 +6,7 @@ export interface PurchaserWithStatus {
   user_id: string;
   fortnite_username: string | null;
   phone_number: string | null;
+  email: string | null;
   vbucks_amount: number;
   amount_cents: number;
   purchased_at: string;
@@ -15,4 +16,6 @@ export interface PurchaserWithStatus {
 
 export interface SkinOrderWithUsername extends SkinOrder {
   fortnite_username: string | null;
+  phone_number: string | null;
+  email: string | null;
 }

@@ -27,6 +27,8 @@ export default function PurchasersPanel({
           <thead>
             <tr className="border-b border-brand-border text-brand-muted text-left">
               <th className="py-3 pr-6 font-medium">Fortnite Username</th>
+              <th className="py-3 pr-6 font-medium">Email</th>
+              <th className="py-3 pr-6 font-medium">Phone</th>
               <th className="py-3 pr-6 font-medium">V-Bucks</th>
               <th className="py-3 pr-6 font-medium">Purchased</th>
               <th className="py-3 font-medium">Friend Request</th>

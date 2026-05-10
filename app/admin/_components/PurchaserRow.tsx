@@ -59,11 +59,17 @@ export default function PurchaserRow({ purchaser }: { purchaser: PurchaserWithSt
           <span className="text-brand-muted italic">Not set</span>
         )}
       </td>
+      <td className="py-3 pr-6 text-sm text-brand-muted">
+        {purchaser.email ?? <span className="italic">—</span>}
+      </td>
+      <td className="py-3 pr-6 text-sm text-brand-muted">
+        {purchaser.phone_number ?? <span className="italic">—</span>}
+      </td>
       <td className="py-3 pr-6 text-sm text-brand-text">
         {purchaser.vbucks_amount.toLocaleString()}
       </td>
       <td className="py-3 pr-6 text-sm text-brand-muted">{formatDate(purchaser.purchased_at)}</td>
-      <td className="py-3 text-sm">
+      <td className="py-3 text-sm whitespace-nowrap min-w-[180px]">
         {status === 'not_sent' && (
           <button
             type="button"

@@ -1,4 +1,5 @@
 import 'server-only';
+import { clerkClient } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getProfile } from '@/services/wallet';
 import { canAccessItemShop } from '@/services/access-gate';
@@ -146,16 +147,24 @@ export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {
   if (!orders || orders.length === 0) return [];
 
   const userIds = [...new Set(orders.map((o: { user_id: string }) => o.user_id))];
-  const { data: profiles } = await supabaseAdmin
-    .from('profiles')
-    .select('id, fortnite_username')
-    .in('id', userIds);
+
+  const [{ data: profiles }, clerk] = await Promise.all([
+    supabaseAdmin
+      .from('profiles')
+      .select('id, fortnite_username, phone_number')
+      .in('id', userIds),
+    clerkClient(),
+  ]);
+
+  const { data: clerkUsers } = await clerk.users.getUserList({ userId: userIds, limit: userIds.length });
 
   const profileMap = new Map(
-    (profiles ?? []).map((p: { id: string; fortnite_username: string | null }) => [
-      p.id,
-      p.fortnite_username,
-    ]),
+    (profiles ?? []).map(
+      (p: { id: string; fortnite_username: string | null; phone_number: string | null }) => [p.id, p],
+    ),
+  );
+  const emailMap = new Map(
+    clerkUsers.map((u) => [u.id, u.emailAddresses[0]?.emailAddress ?? null]),
   );
 
   return orders.map(
@@ -171,7 +180,9 @@ export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {
     }) => ({
       ...order,
       status: order.status as SkinOrderWithUsername['status'],
-      fortnite_username: profileMap.get(order.user_id) ?? null,
+      fortnite_username: profileMap.get(order.user_id)?.fortnite_username ?? null,
+      phone_number: profileMap.get(order.user_id)?.phone_number ?? null,
+      email: emailMap.get(order.user_id) ?? null,
     }),
   );
 }

@@ -16,6 +16,8 @@ export default function SkinOrdersPanel({ orders }: SkinOrdersPanelProps) {
         <thead>
           <tr className="border-b border-brand-border text-brand-muted text-left">
             <th className="py-3 pr-6 font-medium">Fortnite Username</th>
+            <th className="py-3 pr-6 font-medium">Email</th>
+            <th className="py-3 pr-6 font-medium">Phone</th>
             <th className="py-3 pr-6 font-medium">Skin</th>
             <th className="py-3 pr-6 font-medium">V-Bucks</th>
             <th className="py-3 pr-6 font-medium">Ordered</th>
