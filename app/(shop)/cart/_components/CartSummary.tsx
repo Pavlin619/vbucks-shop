@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { formatPrice } from '@/lib/vbucks-packs';
 
 interface CartSummaryProps {
@@ -5,17 +6,25 @@ interface CartSummaryProps {
   totalCents: number;
 }
 
-/** Totals row at the bottom of the cart. */
 export default function CartSummary({ totalVbucks, totalCents }: CartSummaryProps) {
   return (
     <div className="rounded-2xl px-6 py-5 mb-6 bg-brand-purple border border-brand-border-strong">
-      <div className="flex justify-between mb-2">
-        <span className="text-brand-muted">Общо V-Bucks</span>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2 text-brand-muted">
+          <Image
+            src="/vbucks-coin.jpg"
+            alt="V-Bucks"
+            width={20}
+            height={20}
+            className="rounded-full"
+          />
+          <span>Общо V-Bucks</span>
+        </div>
         <span className="font-bold text-brand-text">
           {totalVbucks.toLocaleString()}
         </span>
       </div>
-      <div className="flex justify-between">
+      <div className="border-t border-brand-border-strong pt-4 flex justify-between items-center">
         <span className="text-brand-muted">Обща сума</span>
         <span
           data-testid="cart-total"

@@ -3,6 +3,7 @@
 import 'client-only';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -39,7 +40,7 @@ export default function CheckoutSuccessContent() {
       <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center bg-brand-dark">
         <Card variant="highlight" padding="p-10" className="max-w-md w-full">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-accent/15">
-            <span className="text-3xl animate-pulse">⋯</span>
+            <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
           </div>
           <p className="text-brand-muted">Потвърждаване на плащането...</p>
         </Card>
@@ -52,7 +53,7 @@ export default function CheckoutSuccessContent() {
       <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center bg-brand-dark">
         <Card variant="subtle" padding="p-10" className="max-w-md w-full">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-            <span className="text-3xl">⚠</span>
+            <AlertTriangle className="w-8 h-8 text-yellow-400" />
           </div>
           <h1 className="text-2xl font-extrabold text-brand-text">
             Не успяхме да потвърдим плащането
@@ -73,7 +74,7 @@ export default function CheckoutSuccessContent() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center bg-brand-dark">
       <Card variant="highlight" padding="p-10" className="max-w-md w-full">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-accent/15">
-          <span className="text-3xl">✓</span>
+          <CheckCircle2 className="w-8 h-8 text-brand-accent" />
         </div>
         <h1 className="text-2xl font-extrabold text-brand-text">
           Плащането е успешно!

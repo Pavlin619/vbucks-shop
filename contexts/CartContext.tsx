@@ -14,6 +14,7 @@ export interface CartItem {
 interface CartContextValue {
   items: CartItem[];
   addItem: (packId: string) => void;
+  decrementItem: (packId: string) => void;
   removeItem: (packId: string) => void;
   clearCart: () => void;
   totalItems: number;
@@ -70,6 +71,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   }, [userId]);
 
+  const decrementItem = useCallback((packId: string) => {
+    setItems((prev) => {
+      const existing = prev.find((i) => i.packId === packId);
+      const next =
+        existing && existing.quantity > 1
+          ? prev.map((i) =>
+              i.packId === packId ? { ...i, quantity: i.quantity - 1 } : i,
+            )
+          : prev.filter((i) => i.packId !== packId);
+      saveToStorage(userId, next);
+      return next;
+    });
+  }, [userId]);
+
   const removeItem = useCallback((packId: string) => {
     setItems((prev) => {
       const next = prev.filter((i) => i.packId !== packId);
@@ -90,6 +105,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       value={{
         items,
         addItem,
+        decrementItem,
         removeItem,
         clearCart,
         totalItems: totals.totalItems,
