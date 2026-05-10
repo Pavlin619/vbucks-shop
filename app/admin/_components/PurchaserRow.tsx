@@ -1,18 +1,9 @@
-'use client';
-
-import { useState, useTransition } from 'react';
 import type { FriendRequestStatus, PurchaserWithStatus } from '@/types';
 
-const ROW_CLASSES: Record<FriendRequestStatus, string> = {
-  not_sent: 'border-b border-rose-500/20 bg-rose-500/5',
-  pending: 'border-b border-amber-500/30 bg-amber-500/5',
-  accepted: 'border-b border-green-500/30 bg-green-500/5',
-};
-
-// next valid state in the linear progression; 'accepted' is terminal
-const NEXT: Partial<Record<FriendRequestStatus, FriendRequestStatus>> = {
-  not_sent: 'pending',
-  pending: 'accepted',
+const FRIEND_REQUEST_BADGE: Record<FriendRequestStatus, { label: string; className: string }> = {
+  not_sent: { label: 'Not Sent', className: 'bg-rose-500/20 text-rose-400' },
+  pending: { label: 'Pending', className: 'bg-amber-500/20 text-amber-400' },
+  accepted: { label: 'Friends', className: 'bg-green-500/20 text-green-400' },
 };
 
 function formatDate(iso: string): string {
@@ -26,34 +17,10 @@ function formatDate(iso: string): string {
 }
 
 export default function PurchaserRow({ purchaser }: { purchaser: PurchaserWithStatus }) {
-  const [status, setStatus] = useState<FriendRequestStatus>(purchaser.friend_request_status);
-  const [transitioning, startTransition] = useTransition();
-
-  async function advance() {
-    const next = NEXT[status];
-    if (!next || transitioning) return;
-    const previous = status;
-    setStatus(next);
-
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/admin/profiles/${purchaser.user_id}/friend-request`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: next }),
-        });
-        if (!res.ok) setStatus(previous);
-      } catch {
-        setStatus(previous);
-      }
-    });
-  }
+  const badge = FRIEND_REQUEST_BADGE[purchaser.friend_request_status];
 
   return (
-    <tr
-      data-testid={`friend-request-toggle-${purchaser.user_id}`}
-      className={`${ROW_CLASSES[status]} transition-colors`}
-    >
+    <tr className="border-b border-brand-border hover:bg-brand-purple/20 transition-colors">
       <td className="py-3 pr-6 font-mono text-sm text-brand-text">
         {purchaser.fortnite_username ?? (
           <span className="text-brand-muted italic">Not set</span>
@@ -69,40 +36,15 @@ export default function PurchaserRow({ purchaser }: { purchaser: PurchaserWithSt
         {purchaser.vbucks_amount.toLocaleString()}
       </td>
       <td className="py-3 pr-6 text-sm text-brand-muted">{formatDate(purchaser.purchased_at)}</td>
-      <td className="py-3 text-sm whitespace-nowrap min-w-[180px]">
-        {status === 'not_sent' && (
-          <button
-            type="button"
-            onClick={advance}
-            disabled={transitioning}
-            className={[
-              'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              'bg-brand-accent/20 text-brand-accent hover:bg-brand-accent/30',
-              transitioning ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-            ].join(' ')}
-          >
-            Sent Friend Request →
-          </button>
-        )}
-        {status === 'pending' && (
-          <button
-            type="button"
-            onClick={advance}
-            disabled={transitioning}
-            className={[
-              'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              'bg-green-500/20 text-green-400 hover:bg-green-500/30',
-              transitioning ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-            ].join(' ')}
-          >
-            Accepted by User →
-          </button>
-        )}
-        {status === 'accepted' && (
-          <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/20 text-green-400">
-            ✓ Friends
-          </span>
-        )}
+      <td className="py-3 pr-6">
+        <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-green-500/20 text-green-400">
+          Paid
+        </span>
+      </td>
+      <td className="py-3">
+        <span className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${badge.className}`}>
+          {badge.label}
+        </span>
       </td>
     </tr>
   );

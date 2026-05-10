@@ -7,6 +7,7 @@ export interface Profile {
   vbucks_balance: number;
   friend_request_status: FriendRequestStatus;
   friend_request_accepted_at: string | null;
+  fortnite_username_set_at: string | null;
   created_at: string;
   updated_at: string;
 }

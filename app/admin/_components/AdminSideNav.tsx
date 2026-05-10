@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { CreditCard, Gift } from 'lucide-react';
+import { CreditCard, Gift, UserPlus } from 'lucide-react';
 
 const NAV_ITEMS = [
   { section: 'purchases', label: 'Purchases', icon: CreditCard },
   { section: 'skin-orders', label: 'Skin Orders', icon: Gift },
+  { section: 'friend-requests', label: 'Friend Requests', icon: UserPlus },
 ];
 
 export default function AdminSideNav({ activeSection }: { activeSection: string }) {
