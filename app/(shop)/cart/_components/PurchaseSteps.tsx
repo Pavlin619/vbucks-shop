@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Lock, Loader2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -32,7 +32,13 @@ function Step({ number, status, title, isLast, children }: StepProps) {
               : 'border-2 border-brand-border-strong text-brand-muted',
           ].join(' ')}
         >
-          {isCompleted ? <Check className="w-4 h-4" /> : number}
+          {isCompleted ? (
+            <Check className="w-4 h-4" />
+          ) : status === 'locked' ? (
+            <Lock className="w-3.5 h-3.5" />
+          ) : (
+            number
+          )}
         </div>
         {!isLast && (
           <div
@@ -176,7 +182,14 @@ export default function PurchaseSteps({
             disabled={checkoutLoading || step3Status === 'locked'}
             data-testid="checkout-btn"
           >
-            {checkoutLoading ? 'Зареждане…' : 'Към плащането'}
+            {checkoutLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Зареждане…
+              </span>
+            ) : (
+              'Към плащането'
+            )}
           </Button>
         </div>
       </Step>

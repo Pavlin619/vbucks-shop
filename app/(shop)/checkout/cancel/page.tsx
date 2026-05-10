@@ -1,3 +1,4 @@
+import { XCircle } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
@@ -6,7 +7,7 @@ export default function CheckoutCancelPage() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center bg-brand-dark">
       <Card variant="subtle" padding="p-10" className="max-w-md w-full">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-          <span className="text-3xl">✕</span>
+          <XCircle className="w-8 h-8 text-brand-muted" />
         </div>
         <h1 className="text-2xl font-extrabold text-brand-text">
           Плащането е отменено
