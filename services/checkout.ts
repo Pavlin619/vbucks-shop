@@ -33,7 +33,7 @@ export async function createCheckoutSession({
   let totalVbucks = 0;
   const validatedItems: CheckoutItemInput[] = [];
   const lineItems: {
-    price_data: { currency: string; unit_amount: number; product_data: { name: string } };
+    price_data: { currency: string; unit_amount: number; product_data: { name: string; images: string[] } };
     quantity: number;
   }[] = [];
 
@@ -60,7 +60,7 @@ export async function createCheckoutSession({
       price_data: {
         currency: 'eur',
         unit_amount: pack.price_cents,
-        product_data: { name: pack.label },
+        product_data: { name: pack.label, images: [`${appUrl}/vbucks-coin.jpg`] },
       },
       quantity: qty,
     });
@@ -69,8 +69,7 @@ export async function createCheckoutSession({
   try {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      // Omitting `payment_method_types` lets Stripe surface every
-      // method enabled in the dashboard (card, Link, Apple/Google Pay).
+      payment_method_types: ['card'],
       client_reference_id: userId,
       line_items: lineItems,
       metadata: { userId, vbucks: String(totalVbucks) },

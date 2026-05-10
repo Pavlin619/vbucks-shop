@@ -74,7 +74,7 @@ export default function Header() {
               href="/sign-in"
               size="sm"
             >
-              Sign In
+              Вход
             </Button>
           )}
 

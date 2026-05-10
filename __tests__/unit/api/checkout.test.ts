@@ -154,18 +154,17 @@ describe('POST /api/checkout', () => {
     );
   });
 
-  it('passes client_reference_id and lets Stripe pick payment methods', async () => {
+  it('passes client_reference_id and restricts to card (enables Apple/Google Pay)', async () => {
     mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
     mockSessionCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/x' } as never);
 
     await POST(makeRequest({ items: validItems }));
 
     const [params] = mockSessionCreate.mock.calls[0];
-    expect(params).toMatchObject({ client_reference_id: 'user_abc' });
-    // Omitting `payment_method_types` lets Stripe use the dashboard
-    // configuration (card + Link + Apple/Google Pay etc.) instead of
-    // hard-coding to card-only.
-    expect(params).not.toHaveProperty('payment_method_types');
+    expect(params).toMatchObject({
+      client_reference_id: 'user_abc',
+      payment_method_types: ['card'],
+    });
   });
 
   /**
