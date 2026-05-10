@@ -63,6 +63,7 @@ const profileWith = (overrides: Partial<Profile>): Profile => ({
   vbucks_balance: 5000,
   friend_request_status: 'accepted',
   friend_request_accepted_at: '2026-04-17T00:00:00Z',
+  fortnite_username_set_at: null,
   created_at: '2026-04-17T00:00:00Z',
   updated_at: '2026-04-17T00:00:00Z',
   ...overrides,

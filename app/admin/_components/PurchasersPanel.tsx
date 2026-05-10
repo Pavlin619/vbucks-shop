@@ -31,6 +31,7 @@ export default function PurchasersPanel({
               <th className="py-3 pr-6 font-medium">Phone</th>
               <th className="py-3 pr-6 font-medium">V-Bucks</th>
               <th className="py-3 pr-6 font-medium">Purchased</th>
+              <th className="py-3 pr-6 font-medium">Payment</th>
               <th className="py-3 font-medium">Friend Request</th>
             </tr>
           </thead>

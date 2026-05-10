@@ -22,7 +22,7 @@ export async function updatePhoneNumber(userId: string, phoneNumber: string | nu
 export async function updateFortniteUsername(userId: string, username: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from('profiles')
-    .update({ fortnite_username: username })
+    .update({ fortnite_username: username, fortnite_username_set_at: new Date().toISOString() })
     .eq('id', userId);
 
   if (error) throw new Error(error.message);

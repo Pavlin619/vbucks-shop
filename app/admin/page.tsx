@@ -5,15 +5,16 @@ import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
 import PurchasersPanel from './_components/PurchasersPanel';
 import SkinOrdersPanel from './_components/SkinOrdersPanel';
+import FriendRequestsPanel from './_components/FriendRequestsPanel';
 import AdminSideNav from './_components/AdminSideNav';
-import { getRecentVBucksPurchasers } from '@/services/admin';
+import { getRecentVBucksPurchasers, getFriendRequestQueue } from '@/services/admin';
 import { getPendingOrders } from '@/services/orders';
 
 export const metadata = {
   title: 'Admin · VBucks Shop',
 };
 
-const VALID_SECTIONS = ['purchases', 'skin-orders'] as const;
+const VALID_SECTIONS = ['purchases', 'skin-orders', 'friend-requests'] as const;
 type Section = (typeof VALID_SECTIONS)[number];
 
 const VALID_PAGE_SIZES = [10, 20, 50] as const;
@@ -41,9 +42,10 @@ export default async function AdminPage({
     ? parseInt(rawSize!, 10)
     : 20;
 
-  const [{ data: purchasers, total }, pendingOrders] = await Promise.all([
+  const [{ data: purchasers, total }, pendingOrders, friendRequests] = await Promise.all([
     getRecentVBucksPurchasers({ page, pageSize }),
     getPendingOrders(),
+    getFriendRequestQueue(),
   ]);
 
   return (
@@ -85,6 +87,17 @@ export default async function AdminPage({
                     the V-Bucks back if you cannot fulfil the order.
                   </p>
                   <SkinOrdersPanel orders={pendingOrders} />
+                </Card>
+              )}
+
+              {section === 'friend-requests' && (
+                <Card variant="default">
+                  <h2 className="text-xl font-bold text-brand-text mb-2">Friend Requests</h2>
+                  <p className="text-brand-muted text-xs mb-6">
+                    Customers who have set a Fortnite username. Send them a friend request in-game
+                    so they can receive gifted skins.
+                  </p>
+                  <FriendRequestsPanel entries={friendRequests} />
                 </Card>
               )}
             </section>

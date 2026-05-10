@@ -1,7 +1,9 @@
 import 'server-only';
 import { clerkClient } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import type { FriendRequestStatus, PurchaserWithStatus } from '@/types';
+import type { FriendRequestEntry, FriendRequestStatus, PurchaserWithStatus } from '@/types';
+
+const STATUS_ORDER: Record<FriendRequestStatus, number> = { not_sent: 0, pending: 1, accepted: 2 };
 
 export interface PurchasersPage {
   data: PurchaserWithStatus[];
@@ -83,6 +85,58 @@ export async function getRecentVBucksPurchasers({
   );
 
   return { data, total: count ?? data.length };
+}
+
+export async function getFriendRequestQueue(): Promise<FriendRequestEntry[]> {
+  const { data: profiles, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id, fortnite_username, phone_number, friend_request_status, friend_request_accepted_at, fortnite_username_set_at')
+    .not('fortnite_username', 'is', null);
+
+  if (error) {
+    console.error('[services/admin] getFriendRequestQueue failed', error.message);
+    return [];
+  }
+
+  if (!profiles || profiles.length === 0) return [];
+
+  const userIds = profiles.map((p: { id: string }) => p.id);
+
+  const clerk = await clerkClient();
+  const { data: clerkUsers } = await clerk.users.getUserList({ userId: userIds, limit: userIds.length });
+  const emailMap = new Map(
+    clerkUsers.map((u) => [u.id, u.emailAddresses[0]?.emailAddress ?? null]),
+  );
+
+  const data: FriendRequestEntry[] = profiles.map(
+    (p: {
+      id: string;
+      fortnite_username: string;
+      phone_number: string | null;
+      friend_request_status: FriendRequestStatus;
+      friend_request_accepted_at: string | null;
+      fortnite_username_set_at: string | null;
+    }) => ({
+      user_id: p.id,
+      fortnite_username: p.fortnite_username,
+      phone_number: p.phone_number,
+      email: emailMap.get(p.id) ?? null,
+      friend_request_status: (p.friend_request_status ?? 'not_sent') as FriendRequestStatus,
+      friend_request_accepted_at: p.friend_request_accepted_at,
+      username_set_at: p.fortnite_username_set_at,
+    }),
+  );
+
+  data.sort((a, b) => {
+    const statusDiff = STATUS_ORDER[a.friend_request_status] - STATUS_ORDER[b.friend_request_status];
+    if (statusDiff !== 0) return statusDiff;
+    if (!a.username_set_at && !b.username_set_at) return 0;
+    if (!a.username_set_at) return 1;
+    if (!b.username_set_at) return -1;
+    return b.username_set_at.localeCompare(a.username_set_at);
+  });
+
+  return data;
 }
 
 export async function updateFriendRequestStatus(

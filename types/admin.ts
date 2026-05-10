@@ -14,6 +14,16 @@ export interface PurchaserWithStatus {
   friend_request_accepted_at: string | null;
 }
 
+export interface FriendRequestEntry {
+  user_id: string;
+  fortnite_username: string;
+  phone_number: string | null;
+  email: string | null;
+  friend_request_status: FriendRequestStatus;
+  friend_request_accepted_at: string | null;
+  username_set_at: string | null;
+}
+
 export interface SkinOrderWithUsername extends SkinOrder {
   fortnite_username: string | null;
   phone_number: string | null;
