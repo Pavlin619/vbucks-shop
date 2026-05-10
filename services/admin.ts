@@ -1,4 +1,5 @@
 import 'server-only';
+import { clerkClient } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import type { FriendRequestStatus, PurchaserWithStatus } from '@/types';
 
@@ -51,6 +52,12 @@ export async function getRecentVBucksPurchasers({
     ),
   );
 
+  const clerk = await clerkClient();
+  const { data: clerkUsers } = await clerk.users.getUserList({ userId: userIds, limit: userIds.length });
+  const emailMap = new Map(
+    clerkUsers.map((u) => [u.id, u.emailAddresses[0]?.emailAddress ?? null]),
+  );
+
   const data = purchases.map(
     (purchase: {
       id: string;
@@ -65,6 +72,7 @@ export async function getRecentVBucksPurchasers({
         user_id: purchase.user_id,
         fortnite_username: profile?.fortnite_username ?? null,
         phone_number: profile?.phone_number ?? null,
+        email: emailMap.get(purchase.user_id) ?? null,
         vbucks_amount: purchase.vbucks_amount,
         amount_cents: purchase.amount_cents,
         purchased_at: purchase.created_at,

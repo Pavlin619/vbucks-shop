@@ -49,12 +49,18 @@ export default function OrderRow({ order }: { order: SkinOrderWithUsername }) {
           <span className="text-brand-muted italic">Not set</span>
         )}
       </td>
+      <td className="py-3 pr-6 text-sm text-brand-muted">
+        {order.email ?? <span className="italic">—</span>}
+      </td>
+      <td className="py-3 pr-6 text-sm text-brand-muted">
+        {order.phone_number ?? <span className="italic">—</span>}
+      </td>
       <td className="py-3 pr-6 text-sm text-brand-text">{order.skin_name}</td>
       <td className="py-3 pr-6 text-sm text-brand-text">
         {order.vbucks_cost.toLocaleString()}
       </td>
       <td className="py-3 pr-6 text-sm text-brand-muted">{formatDate(order.created_at)}</td>
-      <td className="py-3 text-sm">
+      <td className="py-3 text-sm whitespace-nowrap min-w-[160px]">
         {status === 'pending' && (
           <div className="flex gap-2">
             <button

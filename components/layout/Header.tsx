@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ShoppingCart, Zap, Menu, X, CircleUser } from 'lucide-react';
-import { useUser } from '@clerk/nextjs';
+import { ShoppingCart, Zap, Menu, X, CircleUser, ShieldCheck } from 'lucide-react';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { useCart } from '@/contexts/CartContext';
 import Button from '@/components/ui/Button';
 
@@ -19,6 +19,8 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { totalItems } = useCart();
   const { isSignedIn } = useUser();
+  const { sessionClaims } = useAuth();
+  const isAdmin = sessionClaims?.metadata?.role === 'admin';
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -57,6 +59,18 @@ export default function Header() {
               Количка (<span data-testid="cart-count">{totalItems}</span>)
             </span>
           </Button>
+
+          {isAdmin && (
+            <Button
+              as="link"
+              href="/admin"
+              variant="secondary"
+              size="sm"
+              aria-label="Admin"
+            >
+              <ShieldCheck className="w-4 h-4" />
+            </Button>
+          )}
 
           {isSignedIn ? (
             <Button
