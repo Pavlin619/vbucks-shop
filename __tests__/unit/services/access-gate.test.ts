@@ -21,6 +21,17 @@ function hoursAgo(h: number): string {
   return new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
 }
 
+// 10:00 AM Sofia (UTC+2 winter) — shop is open, safe to use in eligible assertions.
+const OPEN_TIME = new Date('2026-01-15T08:00:00Z');
+// 01:30 AM Sofia (UTC+2 winter) — inside the 01:00–03:00 closed window.
+const CLOSED_TIME = new Date('2026-01-14T23:30:00Z');
+// 02:59 AM Sofia (UTC+2 winter) — last minute before reopening.
+const CLOSED_TIME_NEAR_END = new Date('2026-01-15T00:59:00Z');
+// Exactly 03:00 AM Sofia (UTC+2 winter) — shop should be open again.
+const REOPEN_TIME = new Date('2026-01-15T01:00:00Z');
+// 00:59 AM Sofia (UTC+2 winter) — just before the closed window starts.
+const BEFORE_CLOSE_TIME = new Date('2026-01-14T22:59:00Z');
+
 describe('canAccessItemShop', () => {
   it('returns unauthenticated when profile is null', () => {
     const result = canAccessItemShop(null);
@@ -89,6 +100,7 @@ describe('canAccessItemShop', () => {
         friend_request_status: 'accepted',
         friend_request_accepted_at: hoursAgo(49),
       }),
+      OPEN_TIME,
     );
     expect(result).toEqual({ allowed: true, reason: 'eligible' });
   });
@@ -99,8 +111,53 @@ describe('canAccessItemShop', () => {
         friend_request_status: 'accepted',
         friend_request_accepted_at: hoursAgo(48),
       }),
+      OPEN_TIME,
     );
     expect(result).toEqual({ allowed: true, reason: 'eligible' });
+  });
+
+  describe('shop_closed window (01:00–03:00 Sofia time)', () => {
+    const eligibleProfile = makeProfile({
+      friend_request_status: 'accepted',
+      friend_request_accepted_at: hoursAgo(49),
+    });
+
+    it('returns shop_closed during the closed window', () => {
+      const result = canAccessItemShop(eligibleProfile, CLOSED_TIME);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe('shop_closed');
+      if (result.reason === 'shop_closed') {
+        expect(result.minutesUntilOpen).toBeGreaterThan(0);
+        expect(result.minutesUntilOpen).toBeLessThanOrEqual(120);
+      }
+    });
+
+    it('returns shop_closed with 1 minute remaining at 02:59', () => {
+      const result = canAccessItemShop(eligibleProfile, CLOSED_TIME_NEAR_END);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe('shop_closed');
+      if (result.reason === 'shop_closed') {
+        expect(result.minutesUntilOpen).toBe(1);
+      }
+    });
+
+    it('returns eligible at exactly 03:00 Sofia time', () => {
+      const result = canAccessItemShop(eligibleProfile, REOPEN_TIME);
+      expect(result).toEqual({ allowed: true, reason: 'eligible' });
+    });
+
+    it('returns eligible at 00:59 Sofia time (before the window opens)', () => {
+      const result = canAccessItemShop(eligibleProfile, BEFORE_CLOSE_TIME);
+      expect(result).toEqual({ allowed: true, reason: 'eligible' });
+    });
+
+    it('does not return shop_closed for ineligible users', () => {
+      const result = canAccessItemShop(
+        makeProfile({ friend_request_status: 'pending' }),
+        CLOSED_TIME,
+      );
+      expect(result.reason).toBe('friend_request_not_accepted');
+    });
   });
 
   it('returns friend_request_not_accepted (not waiting_period) when status is pending even if timestamp is set', () => {
