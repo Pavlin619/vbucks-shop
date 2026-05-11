@@ -1,13 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import Button from '@/components/ui/Button';
 import PriceCard from '@/app/(shop)/item-shop/[offerId]/_components/PriceCard';
 import VBucksBalanceCard from '@/app/(shop)/item-shop/[offerId]/_components/VBucksBalanceCard';
 import OrderOutcome from '@/app/(shop)/item-shop/[offerId]/_components/OrderOutcome';
+import ConfirmBuyModal from '@/app/(shop)/item-shop/[offerId]/_components/ConfirmBuyModal';
 import { usePlaceOrder } from '@/app/(shop)/item-shop/[offerId]/_lib/use-place-order';
 
 interface BuyFlowProps {
   skinId: string;
+  skinName: string;
   vbucksCost: number;
   regularPrice: number;
   userBalance: number;
@@ -24,11 +27,13 @@ interface BuyFlowProps {
  */
 export default function BuyFlow({
   skinId,
+  skinName,
   vbucksCost,
   regularPrice,
   userBalance,
 }: BuyFlowProps) {
   const { loading, error, success, placeOrder } = usePlaceOrder(skinId);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   if (success) {
     return <OrderOutcome success={success} />;
@@ -37,45 +42,60 @@ export default function BuyFlow({
   const sufficient = userBalance >= vbucksCost;
   const buttonLabel = loading ? 'Заявяваме поръчката…' : 'Купи сега';
 
+  function handleConfirm() {
+    setShowConfirm(false);
+    placeOrder();
+  }
+
   return (
-    <div className="space-y-3">
-      <PriceCard
-        vbucksCost={vbucksCost}
-        regularPrice={regularPrice}
-        cta={
-          <Button
-            size="md"
-            fullWidth
-            onClick={placeOrder}
-            disabled={loading || !sufficient}
-            data-testid="buy-skin-btn"
+    <>
+      {showConfirm && (
+        <ConfirmBuyModal
+          skinName={skinName}
+          vbucksCost={vbucksCost}
+          onConfirm={handleConfirm}
+          onClose={() => setShowConfirm(false)}
+        />
+      )}
+      <div className="space-y-3">
+        <PriceCard
+          vbucksCost={vbucksCost}
+          regularPrice={regularPrice}
+          cta={
+            <Button
+              size="md"
+              fullWidth
+              onClick={() => setShowConfirm(true)}
+              disabled={loading || !sufficient}
+              data-testid="buy-skin-btn"
+            >
+              {buttonLabel}
+            </Button>
+          }
+        />
+
+        <VBucksBalanceCard balance={userBalance} cost={vbucksCost} />
+
+        {!sufficient && !error && (
+          <p
+            role="status"
+            data-testid="buy-skin-insufficient"
+            className="text-sm text-center text-brand-accent"
           >
-            {buttonLabel}
-          </Button>
-        }
-      />
+            Нямате достатъчно V-Bucks за тази оферта.
+          </p>
+        )}
 
-      <VBucksBalanceCard balance={userBalance} cost={vbucksCost} />
-
-      {!sufficient && !error && (
-        <p
-          role="status"
-          data-testid="buy-skin-insufficient"
-          className="text-sm text-center text-brand-accent"
-        >
-          Нямате достатъчно V-Bucks за тази оферта.
-        </p>
-      )}
-
-      {error && (
-        <p
-          role="alert"
-          data-testid="buy-skin-error"
-          className="text-sm text-center text-brand-accent"
-        >
-          {error}
-        </p>
-      )}
-    </div>
+        {error && (
+          <p
+            role="alert"
+            data-testid="buy-skin-error"
+            className="text-sm text-center text-brand-accent"
+          >
+            {error}
+          </p>
+        )}
+      </div>
+    </>
   );
 }
