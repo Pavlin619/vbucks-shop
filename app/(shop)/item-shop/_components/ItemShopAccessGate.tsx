@@ -102,6 +102,31 @@ function GateContent({ gate }: Pick<ItemShopAccessGateProps, 'gate'>) {
     );
   }
 
+  if (gate.reason === 'shop_closed') {
+    const h = Math.floor(gate.minutesUntilOpen / 60);
+    const m = gate.minutesUntilOpen % 60;
+    const timeLabel =
+      h > 0 && m > 0
+        ? `${h} ч. ${m} мин.`
+        : h > 0
+          ? `${h} ч.`
+          : `${m} мин.`;
+
+    return (
+      <div>
+        <h2 className="text-lg font-bold text-brand-text mb-1">
+          Магазинът е временно затворен
+        </h2>
+        <p className="text-sm text-brand-muted">
+          Item Shop се обновява всяка сутрин в 03:00 ч. За да осигурим достатъчно
+          време за изпращане на скиновете преди обновяването, не приемаме поръчки
+          между 01:00 и 03:00 ч. Ще може да поръчвате скинове отново след{' '}
+          <span className="text-brand-accent font-medium">{timeLabel}</span>.
+        </p>
+      </div>
+    );
+  }
+
   // waiting_period
   const timeLabel =
     gate.hoursRemaining === 0
