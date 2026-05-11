@@ -73,6 +73,7 @@ export default async function SkinDetailPage({ params }: SkinDetailPageProps) {
               {gate.allowed ? (
                 <BuyFlow
                   skinId={entry.offerId}
+                  skinName={entry.name}
                   vbucksCost={entry.vbucks_cost}
                   regularPrice={entry.regular_price}
                   userBalance={profile!.vbucks_balance}
