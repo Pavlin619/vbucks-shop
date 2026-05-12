@@ -11,29 +11,19 @@ export type AccessGateResult =
   | { allowed: true; reason: 'eligible' };
 
 const GATE_HOURS = 48;
-// Shop closes at 01:00 and reopens at 03:00 Bulgarian time to guarantee
-// all pending orders are gifted before the daily Item Shop refresh.
-const CLOSE_HOUR = 1;
-const OPEN_HOUR = 3;
+// Shop closes at 22:00 UTC and reopens at 00:00 UTC (midnight), giving admin
+// 2 hours to gift pending orders before the Fortnite shop refreshes at 00:00 UTC.
+const CLOSE_HOUR_UTC = 22;
 
 function shopClosedWindow(now: Date = new Date()): { closed: boolean; minutesUntilOpen: number } {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Sofia',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  }).formatToParts(now);
+  const hour = now.getUTCHours();
+  const minute = now.getUTCMinutes();
 
-  const hourPart = parts.find((p) => p.type === 'hour');
-  const minutePart = parts.find((p) => p.type === 'minute');
-  const hour = hourPart ? parseInt(hourPart.value, 10) : 0;
-  const minute = minutePart ? parseInt(minutePart.value, 10) : 0;
-
-  if (hour < CLOSE_HOUR || hour >= OPEN_HOUR) {
+  if (hour < CLOSE_HOUR_UTC) {
     return { closed: false, minutesUntilOpen: 0 };
   }
 
-  const minutesUntilOpen = Math.max(1, OPEN_HOUR * 60 - (hour * 60 + minute));
+  const minutesUntilOpen = Math.max(1, 24 * 60 - (hour * 60 + minute));
   return { closed: true, minutesUntilOpen };
 }
 
