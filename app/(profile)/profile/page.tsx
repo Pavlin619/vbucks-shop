@@ -24,7 +24,7 @@ export default async function ProfilePage({
 }) {
   const { userId } = await auth.protect();
 
-  const [user, profile, orders, params] = await Promise.all([
+  const [user, profile, ordersResult, params] = await Promise.all([
     currentUser(),
     getProfile(userId),
     getAllOrders(userId),
@@ -55,7 +55,16 @@ export default async function ProfilePage({
             </aside>
 
             <section>
-              {section === 'orders' && <MyOrdersPanel orders={orders} />}
+              {section === 'orders' && (
+                <>
+                  {ordersResult.dbError && (
+                    <p className="text-sm text-rose-400 mb-4">
+                      Неуспешно зареждане на поръчките. Моля, опреснете страницата.
+                    </p>
+                  )}
+                  <MyOrdersPanel orders={ordersResult.data} />
+                </>
+              )}
               {section === 'fortnite' && <FortniteAccountPanel profile={profile} />}
             </section>
           </div>

@@ -43,7 +43,7 @@ export default function CheckoutSuccessContent() {
           setState('error');
           return;
         }
-        const data = (await res.json()) as { paid: boolean };
+        const data = (await res.json()) as { paid: boolean; pending?: boolean };
         if (data.paid) {
           clearCart();
           setState('paid');

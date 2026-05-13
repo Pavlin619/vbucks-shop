@@ -5,6 +5,8 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { useUser } from '@clerk/nextjs';
 import { loadFromStorage, saveToStorage } from '@/contexts/_lib/cart-storage';
 import { computeCartTotals } from '@/contexts/_lib/cart-totals';
+import { getPackById } from '@/lib/vbucks-packs';
+import { useToast } from '@/contexts/ToastContext';
 
 export interface CartItem {
   packId: string;
@@ -32,8 +34,14 @@ function mergeCartItems(base: CartItem[], incoming: CartItem[]): CartItem[] {
   return Array.from(map, ([packId, quantity]) => ({ packId, quantity }));
 }
 
+function pruneStaleItems(rawItems: CartItem[]): { valid: CartItem[]; hadStale: boolean } {
+  const valid = rawItems.filter((i) => getPackById(i.packId) !== undefined);
+  return { valid, hadStale: valid.length < rawItems.length };
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded } = useUser();
+  const { push } = useToast();
   // Treat Clerk's loading state as guest so cart interactions work immediately.
   const userId = isLoaded ? (user?.id ?? null) : null;
   const [items, setItems] = useState<CartItem[]>([]);
@@ -44,19 +52,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const prev = prevUserIdRef.current;
     prevUserIdRef.current = userId;
 
+    let loaded: CartItem[];
     if (prev === null && userId !== null) {
       // Login transition: merge guest cart into the user's saved cart.
       const guestItems = loadFromStorage(null);
       const userItems = loadFromStorage(userId);
-      const merged = mergeCartItems(userItems, guestItems);
-      saveToStorage(userId, merged);
-      saveToStorage(null, []);
-      setItems(merged);
+      loaded = mergeCartItems(userItems, guestItems);
     } else {
       // Initial load, logout, or account switch — just load the right cart.
-      setItems(loadFromStorage(userId));
+      loaded = loadFromStorage(userId);
     }
-  }, [userId]);
+
+    const isLoginTransition = prev === null && userId !== null;
+    const { valid, hadStale } = pruneStaleItems(loaded);
+
+    if (hadStale) {
+      saveToStorage(userId, valid);
+      push({ variant: 'error', message: 'Some items in your cart are no longer available and were removed.' });
+    }
+
+    if (isLoginTransition) {
+      if (!hadStale) saveToStorage(userId, valid);
+      saveToStorage(null, []);
+    }
+
+    setItems(valid);
+  }, [userId, push]);
 
   const addItem = useCallback((packId: string) => {
     setItems((prev) => {

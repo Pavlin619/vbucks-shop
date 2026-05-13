@@ -6,15 +6,16 @@ import Card from '@/components/ui/Card';
 import PurchasersPanel from './_components/PurchasersPanel';
 import SkinOrdersPanel from './_components/SkinOrdersPanel';
 import FriendRequestsPanel from './_components/FriendRequestsPanel';
+import FlaggedAccountsPanel from './_components/FlaggedAccountsPanel';
 import AdminSideNav from './_components/AdminSideNav';
-import { getRecentVBucksPurchasers, getFriendRequestQueue } from '@/services/admin';
+import { getRecentVBucksPurchasers, getFriendRequestQueue, getFailedNotificationsCount, getFlaggedAccounts } from '@/services/admin';
 import { getPendingOrders } from '@/services/orders';
 
 export const metadata = {
   title: 'Admin · VBucks Shop',
 };
 
-const VALID_SECTIONS = ['purchases', 'skin-orders', 'friend-requests'] as const;
+const VALID_SECTIONS = ['purchases', 'skin-orders', 'friend-requests', 'flagged-accounts'] as const;
 type Section = (typeof VALID_SECTIONS)[number];
 
 const VALID_PAGE_SIZES = [10, 20, 50] as const;
@@ -42,11 +43,14 @@ export default async function AdminPage({
     ? parseInt(rawSize!, 10)
     : 20;
 
-  const [{ data: purchasers, total }, pendingOrders, friendRequests] = await Promise.all([
-    getRecentVBucksPurchasers({ page, pageSize }),
-    getPendingOrders(),
-    getFriendRequestQueue(),
-  ]);
+  const [purchasersResult, pendingOrdersResult, friendRequestsResult, failedNotifCount, flaggedAccountsResult] =
+    await Promise.all([
+      getRecentVBucksPurchasers({ page, pageSize }),
+      getPendingOrders(),
+      getFriendRequestQueue(),
+      getFailedNotificationsCount(),
+      getFlaggedAccounts(),
+    ]);
 
   return (
     <>
@@ -54,6 +58,13 @@ export default async function AdminPage({
       <main className="min-h-screen bg-brand-dark pt-24 pb-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-2xl font-bold text-brand-text mb-6">Admin Dashboard</h1>
+
+          {failedNotifCount > 0 && (
+            <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+              <span className="font-semibold">{failedNotifCount} email notification{failedNotifCount > 1 ? 's' : ''} failed to send.</span>{' '}
+              Check the <code className="text-xs">failed_notifications</code> table and resend manually if needed.
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 items-start">
             <aside className="flex flex-col gap-3">
@@ -70,9 +81,14 @@ export default async function AdminPage({
               {section === 'purchases' && (
                 <Card variant="default">
                   <h2 className="text-xl font-bold text-brand-text mb-6">V-Bucks Purchases</h2>
+                  {purchasersResult.dbError && (
+                    <p className="text-sm text-rose-400 mb-4">
+                      Failed to load purchases. Please refresh.
+                    </p>
+                  )}
                   <PurchasersPanel
-                    purchasers={purchasers}
-                    total={total}
+                    purchasers={purchasersResult.data}
+                    total={purchasersResult.total}
                     page={page}
                     pageSize={pageSize}
                   />
@@ -86,7 +102,12 @@ export default async function AdminPage({
                     Gift each item in-game via Fortnite, then mark as gifted. Use Refund to credit
                     the V-Bucks back if you cannot fulfil the order.
                   </p>
-                  <SkinOrdersPanel orders={pendingOrders} />
+                  {pendingOrdersResult.dbError && (
+                    <p className="text-sm text-rose-400 mb-4">
+                      Failed to load orders. Please refresh.
+                    </p>
+                  )}
+                  <SkinOrdersPanel orders={pendingOrdersResult.data} />
                 </Card>
               )}
 
@@ -97,7 +118,28 @@ export default async function AdminPage({
                     Customers who have set a Fortnite username. Send them a friend request in-game
                     so they can receive gifted skins.
                   </p>
-                  <FriendRequestsPanel entries={friendRequests} />
+                  {friendRequestsResult.dbError && (
+                    <p className="text-sm text-rose-400 mb-4">
+                      Failed to load friend requests. Please refresh.
+                    </p>
+                  )}
+                  <FriendRequestsPanel entries={friendRequestsResult.data} />
+                </Card>
+              )}
+
+              {section === 'flagged-accounts' && (
+                <Card variant="default">
+                  <h2 className="text-xl font-bold text-brand-text mb-2">Flagged Accounts</h2>
+                  <p className="text-brand-muted text-xs mb-6">
+                    Accounts flagged due to Stripe chargebacks or disputes. Review and take manual
+                    action as needed.
+                  </p>
+                  {flaggedAccountsResult.dbError && (
+                    <p className="text-sm text-rose-400 mb-4">
+                      Failed to load flagged accounts. Please refresh.
+                    </p>
+                  )}
+                  <FlaggedAccountsPanel accounts={flaggedAccountsResult.data} />
                 </Card>
               )}
             </section>

@@ -243,43 +243,45 @@ export function groupByLayout(entries: ShopEntry[]): ShopSection[] {
 // Cache key includes the UTC date so the entry rotates automatically at
 // midnight UTC — exactly when Fortnite refreshes its shop. revalidate:false
 // means the entry never times out on its own; the date flip is the expiry.
+//
+// The upstream fetch runs OUTSIDE unstable_cache and throws on any failure.
+// Throwing prevents the cache layer from memoizing an empty-array error
+// response, which would lock the shop out for the rest of the UTC day.
 const _fetchShopEntriesForDate = unstable_cache(
   async (_dateUtc: string): Promise<ShopEntry[]> => {
-    try {
-      const res = await fetch(FORTNITE_SHOP_URL, {
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-      });
+    const res = await fetch(FORTNITE_SHOP_URL, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
 
-      if (!res.ok) {
-        console.error('[services/skins] Fortnite shop API returned non-2xx', res.status);
-        return [];
-      }
-
-      const payload = (await res.json()) as RawShopResponse;
-      const rawEntries = payload.data?.entries;
-      if (!Array.isArray(rawEntries)) {
-        console.error('[services/skins] Fortnite shop payload missing entries array');
-        return [];
-      }
-
-      const entries: ShopEntry[] = [];
-      for (const raw of rawEntries) {
-        const mapped = mapShopEntry(raw);
-        if (mapped) entries.push(mapped);
-      }
-
-      return entries;
-    } catch (err) {
-      console.error('[services/skins] fetch failed', err);
-      return [];
+    if (!res.ok) {
+      throw new Error(`Fortnite shop API returned non-2xx: ${res.status}`);
     }
+
+    const payload = (await res.json()) as RawShopResponse;
+    const rawEntries = payload.data?.entries;
+    if (!Array.isArray(rawEntries)) {
+      throw new Error('Fortnite shop payload missing entries array');
+    }
+
+    const entries: ShopEntry[] = [];
+    for (const raw of rawEntries) {
+      const mapped = mapShopEntry(raw);
+      if (mapped) entries.push(mapped);
+    }
+
+    return entries;
   },
   ['fortnite-shop'],
   { revalidate: false, tags: ['fortnite-shop'] },
 );
 
-export function fetchShopEntries(): Promise<ShopEntry[]> {
+export async function fetchShopEntries(): Promise<ShopEntry[]> {
   const dateUtc = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD" in UTC
-  return _fetchShopEntriesForDate(dateUtc);
+  try {
+    return await _fetchShopEntriesForDate(dateUtc);
+  } catch (err) {
+    console.error('[services/skins] fetch failed, serving empty shop', err);
+    return [];
+  }
 }

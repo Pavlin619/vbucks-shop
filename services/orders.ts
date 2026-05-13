@@ -119,7 +119,9 @@ export async function createOrder(
   };
 }
 
-export async function getAllOrders(userId: string): Promise<SkinOrder[]> {
+export async function getAllOrders(
+  userId: string,
+): Promise<{ data: SkinOrder[]; dbError: boolean }> {
   const { data, error } = await supabaseAdmin
     .from('skin_orders')
     .select('id, user_id, skin_id, skin_name, vbucks_cost, status, created_at, resolved_at')
@@ -128,12 +130,15 @@ export async function getAllOrders(userId: string): Promise<SkinOrder[]> {
 
   if (error) {
     console.error('[services/orders] getAllOrders failed', error.message);
-    return [];
+    return { data: [], dbError: true };
   }
-  return (data ?? []) as SkinOrder[];
+  return { data: (data ?? []) as SkinOrder[], dbError: false };
 }
 
-export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {
+export async function getPendingOrders(): Promise<{
+  data: SkinOrderWithUsername[];
+  dbError: boolean;
+}> {
   const { data: orders, error } = await supabaseAdmin
     .from('skin_orders')
     .select('id, user_id, skin_id, skin_name, vbucks_cost, status, created_at, resolved_at')
@@ -142,9 +147,9 @@ export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {
 
   if (error) {
     console.error('[services/orders] getPendingOrders failed', error.message);
-    return [];
+    return { data: [], dbError: true };
   }
-  if (!orders || orders.length === 0) return [];
+  if (!orders || orders.length === 0) return { data: [], dbError: false };
 
   const userIds = [...new Set(orders.map((o: { user_id: string }) => o.user_id))];
 
@@ -167,7 +172,7 @@ export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {
     clerkUsers.map((u) => [u.id, u.emailAddresses[0]?.emailAddress ?? null]),
   );
 
-  return orders.map(
+  const data = orders.map(
     (order: {
       id: string;
       user_id: string;
@@ -185,6 +190,7 @@ export async function getPendingOrders(): Promise<SkinOrderWithUsername[]> {
       email: emailMap.get(order.user_id) ?? null,
     }),
   );
+  return { data, dbError: false };
 }
 
 export async function fulfillOrder(
