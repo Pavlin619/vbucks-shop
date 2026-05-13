@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
-import { useSaveUsername } from '@/app/(profile)/profile/_lib/use-save-username';
+import { useSaveFortniteUsername } from '@/lib/hooks/use-save-fortnite-username';
 import { isValidFortniteUsername, FORTNITE_USERNAME_ERROR } from '@/lib/fortnite-username';
+import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
 
 const DEBOUNCE_MS = 500;
@@ -12,7 +13,7 @@ export default function FortniteUsernameForm() {
   const [value, setValue] = useState('');
   const [touched, setTouched] = useState(false);
   const [debouncedValue, setDebouncedValue] = useState('');
-  const { saving, error: apiError, saveUsername } = useSaveUsername();
+  const { saving, error: apiError, saveUsername } = useSaveFortniteUsername();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedValue(value), DEBOUNCE_MS);
@@ -74,7 +75,11 @@ export default function FortniteUsernameForm() {
             {FORTNITE_USERNAME_ERROR}
           </p>
         )}
-        {apiError && <p className="mt-1.5 text-xs text-rose-400">{apiError}</p>}
+        {apiError && (
+          <Alert variant="error" className="mt-2 text-xs">
+            {apiError}
+          </Alert>
+        )}
       </div>
       <Button type="submit" size="sm" disabled={!canSubmit}>
         {saving ? 'Запазване...' : 'Запази'}

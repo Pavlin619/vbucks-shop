@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { apiFetch, ApiError } from '@/lib/api-client';
+import { useToast } from '@/contexts/ToastContext';
 import type { FriendRequestEntry, FriendRequestStatus } from '@/types';
+
+const ADVANCE_LABELS: Record<FriendRequestStatus, string> = {
+  not_sent: 'Reset to not sent',
+  pending: 'Friend request marked sent',
+  accepted: 'Marked as accepted',
+};
 
 const ROW_CLASSES: Record<FriendRequestStatus, string> = {
   not_sent: 'border-b border-rose-500/20 bg-rose-500/5',
@@ -27,6 +35,7 @@ function formatDate(iso: string): string {
 export default function FriendRequestRow({ entry }: { entry: FriendRequestEntry }) {
   const [status, setStatus] = useState<FriendRequestStatus>(entry.friend_request_status);
   const [transitioning, startTransition] = useTransition();
+  const { push } = useToast();
 
   async function advance() {
     const next = NEXT[status];
@@ -36,14 +45,16 @@ export default function FriendRequestRow({ entry }: { entry: FriendRequestEntry 
 
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/admin/profiles/${entry.user_id}/friend-request`, {
+        await apiFetch(`/api/admin/profiles/${entry.user_id}/friend-request`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: next }),
         });
-        if (!res.ok) setStatus(previous);
-      } catch {
+        push({ variant: 'success', message: ADVANCE_LABELS[next] });
+      } catch (e) {
         setStatus(previous);
+        const message = e instanceof ApiError ? e.message : 'Update failed';
+        push({ variant: 'error', message });
       }
     });
   }

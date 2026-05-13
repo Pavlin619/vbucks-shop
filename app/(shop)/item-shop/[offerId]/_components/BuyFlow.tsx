@@ -1,11 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
 import PriceCard from '@/app/(shop)/item-shop/[offerId]/_components/PriceCard';
 import VBucksBalanceCard from '@/app/(shop)/item-shop/[offerId]/_components/VBucksBalanceCard';
 import OrderOutcome from '@/app/(shop)/item-shop/[offerId]/_components/OrderOutcome';
 import ConfirmBuyModal from '@/app/(shop)/item-shop/[offerId]/_components/ConfirmBuyModal';
+import InsufficientBalanceModal from '@/app/(shop)/item-shop/[offerId]/_components/InsufficientBalanceModal';
+import ShopRotatedModal from '@/app/(shop)/item-shop/[offerId]/_components/ShopRotatedModal';
 import { usePlaceOrder } from '@/app/(shop)/item-shop/[offerId]/_lib/use-place-order';
 
 interface BuyFlowProps {
@@ -32,7 +35,7 @@ export default function BuyFlow({
   regularPrice,
   userBalance,
 }: BuyFlowProps) {
-  const { loading, error, success, placeOrder } = usePlaceOrder(skinId);
+  const { loading, error, success, placeOrder, reset } = usePlaceOrder(skinId);
   const [showConfirm, setShowConfirm] = useState(false);
 
   if (success) {
@@ -57,6 +60,17 @@ export default function BuyFlow({
           onClose={() => setShowConfirm(false)}
         />
       )}
+
+      {error?.kind === 'insufficient' && (
+        <InsufficientBalanceModal
+          balance={error.balance}
+          cost={error.cost}
+          onClose={reset}
+        />
+      )}
+
+      {error?.kind === 'shop_rotated' && <ShopRotatedModal onClose={reset} />}
+
       <div className="space-y-3">
         <PriceCard
           vbucksCost={vbucksCost}
@@ -77,23 +91,47 @@ export default function BuyFlow({
         <VBucksBalanceCard balance={userBalance} cost={vbucksCost} />
 
         {!sufficient && !error && (
-          <p
-            role="status"
+          <Alert
+            variant="info"
             data-testid="buy-skin-insufficient"
-            className="text-sm text-center text-brand-accent"
+            className="text-center"
           >
             Нямате достатъчно V-Bucks за тази оферта.
-          </p>
+          </Alert>
         )}
 
-        {error && (
-          <p
-            role="alert"
+        {error?.kind === 'no_username' && (
+          <Alert
+            variant="warning"
             data-testid="buy-skin-error"
-            className="text-sm text-center text-brand-accent"
+            action={
+              <Button as="link" href="/profile" size="sm" variant="secondary">
+                Профил
+              </Button>
+            }
           >
-            {error}
-          </p>
+            Задайте Fortnite потребителско име в профила си преди покупка.
+          </Alert>
+        )}
+
+        {error?.kind === 'forbidden' && (
+          <Alert variant="info" data-testid="buy-skin-error">
+            {error.message}
+          </Alert>
+        )}
+
+        {error?.kind === 'transient' && (
+          <Alert
+            variant="error"
+            data-testid="buy-skin-error"
+            action={
+              <Button size="sm" onClick={placeOrder} disabled={loading}>
+                Опитайте отново
+              </Button>
+            }
+          >
+            Поръчката не успя. Моля, опитайте отново.
+          </Alert>
         )}
       </div>
     </>

@@ -10,6 +10,10 @@ vi.mock('@/services/wallet', () => ({
   updateFortniteUsername: vi.fn(),
 }));
 
+vi.mock('@/services/email', () => ({
+  sendFriendRequestNeededNotificationToAdmin: vi.fn(),
+}));
+
 import { auth } from '@clerk/nextjs/server';
 import { updateFortniteUsername } from '@/services/wallet';
 import { PUT } from '@/app/api/profile/fortnite-username/route';

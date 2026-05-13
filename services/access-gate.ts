@@ -11,20 +11,29 @@ export type AccessGateResult =
   | { allowed: true; reason: 'eligible' };
 
 const GATE_HOURS = 48;
-// Shop closes at 22:00 UTC and reopens at 00:00 UTC (midnight), giving admin
-// 2 hours to gift pending orders before the Fortnite shop refreshes at 00:00 UTC.
-const CLOSE_HOUR_UTC = 22;
+// Shop closes at 23:00 UTC (01:00 Sofia, EET/UTC+2) and reopens at 01:00 UTC
+// (03:00 Sofia), giving admin 2 hours to gift pending orders before the
+// Fortnite shop refreshes. The window crosses midnight UTC, so both branches
+// of the hour check are needed.
+const CLOSE_HOUR_UTC = 23;
+const OPEN_HOUR_UTC = 1;
 
 function shopClosedWindow(now: Date = new Date()): { closed: boolean; minutesUntilOpen: number } {
   const hour = now.getUTCHours();
   const minute = now.getUTCMinutes();
 
-  if (hour < CLOSE_HOUR_UTC) {
+  // Closed window spans midnight: [23:00, 01:00) UTC.
+  const closed = hour >= CLOSE_HOUR_UTC || hour < OPEN_HOUR_UTC;
+  if (!closed) {
     return { closed: false, minutesUntilOpen: 0 };
   }
 
-  const minutesUntilOpen = Math.max(1, 24 * 60 - (hour * 60 + minute));
-  return { closed: true, minutesUntilOpen };
+  const minutesToOpen =
+    hour >= CLOSE_HOUR_UTC
+      ? (24 - hour) * 60 - minute + OPEN_HOUR_UTC * 60
+      : (OPEN_HOUR_UTC - hour) * 60 - minute;
+
+  return { closed: true, minutesUntilOpen: Math.max(1, minutesToOpen) };
 }
 
 export function canAccessItemShop(profile: Profile | null, now?: Date): AccessGateResult {

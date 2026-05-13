@@ -2,18 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-vi.mock('@/app/(shop)/cart/_lib/use-save-username', () => ({
-  useSaveUsername: vi.fn(),
+vi.mock('@/lib/hooks/use-save-fortnite-username', () => ({
+  useSaveFortniteUsername: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(() => ({ refresh: vi.fn(), push: vi.fn() })),
 }));
 
-import { useSaveUsername } from '@/app/(shop)/cart/_lib/use-save-username';
+import { useSaveFortniteUsername } from '@/lib/hooks/use-save-fortnite-username';
 import PurchaseSteps from '@/app/(shop)/cart/_components/PurchaseSteps';
 
-const mockUseSaveUsername = vi.mocked(useSaveUsername);
+const mockUseSaveUsername = vi.mocked(useSaveFortniteUsername);
 
 const defaultSaveHook = {
   saving: false,
@@ -240,19 +240,55 @@ describe('PurchaseSteps', () => {
       expect(btn.textContent).toContain('Зареждане');
     });
 
-    it('shows checkout error when present', () => {
+    it('shows transient checkout error with a retry button', async () => {
+      const onCheckout = vi.fn();
+      render(
+        <PurchaseSteps
+          isAuthenticated={true}
+          fortniteUsername="NinjaPlayer"
+          onCheckout={onCheckout}
+          checkoutLoading={false}
+          checkoutError={{ kind: 'transient', message: 'Payment service unavailable' }}
+        />,
+      );
+
+      const alert = screen.getByRole('alert');
+      expect(alert.textContent).toContain('Неуспешно плащане');
+
+      const retry = screen.getByRole('button', { name: 'Опитайте отново' });
+      await userEvent.click(retry);
+      expect(onCheckout).toHaveBeenCalled();
+    });
+
+    it('shows the no_username variant with a profile link', () => {
       render(
         <PurchaseSteps
           isAuthenticated={true}
           fortniteUsername="NinjaPlayer"
           onCheckout={noop}
           checkoutLoading={false}
-          checkoutError="Payment failed"
+          checkoutError={{ kind: 'no_username', message: 'fortnite_username_required' }}
         />,
       );
 
       const alert = screen.getByRole('alert');
-      expect(alert.textContent).toContain('Payment failed');
+      expect(alert.textContent).toContain('Задайте Fortnite');
+      expect(screen.getByRole('link', { name: 'Профил' }).getAttribute('href')).toBe('/profile');
+    });
+
+    it('shows the invalid_cart variant with the backend message', () => {
+      render(
+        <PurchaseSteps
+          isAuthenticated={true}
+          fortniteUsername="NinjaPlayer"
+          onCheckout={noop}
+          checkoutLoading={false}
+          checkoutError={{ kind: 'invalid_cart', message: 'Invalid packId: bogus' }}
+        />,
+      );
+
+      const alert = screen.getByRole('alert');
+      expect(alert.textContent).toContain('Invalid packId: bogus');
     });
   });
 });

@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { apiFetch, ApiError } from '@/lib/api-client';
+import { useToast } from '@/contexts/ToastContext';
 import type { OrderStatus, SkinOrderWithUsername } from '@/types';
+
+const ACTION_LABELS: Record<'gifted' | 'refunded', string> = {
+  gifted: 'Marked as gifted',
+  refunded: 'Marked as refunded',
+};
 
 const ROW_CLASSES: Record<OrderStatus, string> = {
   pending: 'border-b border-amber-500/30 bg-amber-500/5',
@@ -22,6 +29,7 @@ function formatDate(iso: string): string {
 export default function OrderRow({ order }: { order: SkinOrderWithUsername }) {
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [transitioning, startTransition] = useTransition();
+  const { push } = useToast();
 
   async function updateStatus(action: 'gifted' | 'refunded') {
     if (status !== 'pending' || transitioning) return;
@@ -30,14 +38,16 @@ export default function OrderRow({ order }: { order: SkinOrderWithUsername }) {
 
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/admin/orders/${order.id}`, {
+        await apiFetch(`/api/admin/orders/${order.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: action }),
         });
-        if (!res.ok) setStatus(previous);
-      } catch {
+        push({ variant: 'success', message: ACTION_LABELS[action] });
+      } catch (e) {
         setStatus(previous);
+        const message = e instanceof ApiError ? e.message : 'Update failed';
+        push({ variant: 'error', message });
       }
     });
   }

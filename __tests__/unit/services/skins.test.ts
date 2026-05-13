@@ -1,4 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// unstable_cache requires a Next.js server context (incrementalCache) that
+// doesn't exist in unit tests — make it a transparent pass-through.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 import {
   fetchShopEntries,
   groupByLayout,

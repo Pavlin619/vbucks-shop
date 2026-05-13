@@ -3,14 +3,20 @@
 import 'client-only';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch, ApiError } from '@/lib/api-client';
 
-interface UseSaveUsernameResult {
+interface UseSaveFortniteUsernameResult {
   saving: boolean;
   error: string | null;
   saveUsername: (username: string) => Promise<void>;
 }
 
-export function useSaveUsername(): UseSaveUsernameResult {
+/**
+ * Shared hook for PUT /api/profile/fortnite-username. 401s redirect to the
+ * sign-in page through `apiFetch`, so a session expiry mid-form bounces the
+ * user instead of looking like a save error.
+ */
+export function useSaveFortniteUsername(): UseSaveFortniteUsernameResult {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -19,18 +25,18 @@ export function useSaveUsername(): UseSaveUsernameResult {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/profile/fortnite-username', {
+      await apiFetch('/api/profile/fortnite-username', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fortnite_username: username.trim() }),
       });
-      if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error ?? 'Неуспешно запазване');
-      }
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Неуспешно запазване');
+      if (e instanceof ApiError) {
+        setError(e.message);
+      } else {
+        setError('Неуспешно запазване');
+      }
     } finally {
       setSaving(false);
     }
