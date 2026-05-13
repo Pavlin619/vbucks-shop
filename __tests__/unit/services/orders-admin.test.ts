@@ -7,6 +7,14 @@ vi.mock('@/lib/supabase/admin', () => ({
   },
 }));
 
+vi.mock('@clerk/nextjs/server', () => ({
+  clerkClient: vi.fn().mockResolvedValue({
+    users: {
+      getUserList: vi.fn().mockResolvedValue({ data: [] }),
+    },
+  }),
+}));
+
 vi.mock('@/services/email', () => ({
   sendOrderFulfilledNotificationToAdmin: vi.fn().mockResolvedValue(undefined),
   sendOrderRefundedNotificationToAdmin: vi.fn().mockResolvedValue(undefined),

@@ -6,6 +6,14 @@ vi.mock('@/lib/supabase/admin', () => ({
   },
 }));
 
+vi.mock('@clerk/nextjs/server', () => ({
+  clerkClient: vi.fn().mockResolvedValue({
+    users: {
+      getUserList: vi.fn().mockResolvedValue({ data: [] }),
+    },
+  }),
+}));
+
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   getRecentVBucksPurchasers,

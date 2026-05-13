@@ -2,7 +2,7 @@
 
 import 'client-only';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { apiFetch, ApiError } from '@/lib/api-client';
 
 export interface PlaceOrderSuccess {
   orderId: string;
@@ -11,31 +11,44 @@ export interface PlaceOrderSuccess {
   remainingBalance: number;
 }
 
+export type PlaceOrderError =
+  | { kind: 'no_username'; message: string }
+  | { kind: 'forbidden'; message: string }
+  | { kind: 'shop_rotated'; message: string }
+  | { kind: 'insufficient'; message: string; balance: number; cost: number }
+  | { kind: 'transient'; message: string };
+
 interface UsePlaceOrderResult {
   loading: boolean;
-  error: string | null;
+  error: PlaceOrderError | null;
   success: PlaceOrderSuccess | null;
   placeOrder: () => Promise<void>;
   reset: () => void;
 }
 
-/**
- * Encapsulates the POST `/api/orders` call and the surrounding UI state.
- * Lives next to the detail page because no other route triggers a single-
- * skin order today; if a future "buy now" surface needs the same flow it
- * can move up into a shared `_lib/`.
- *
- * Behaviour:
- *  - 401 → redirect the user to /sign-in (middleware will resume after).
- *  - 2xx → expose the success payload so the caller can render outcome UI.
- *  - any other status → expose the API's `error` string (or a fallback).
- *  - loading state always resets in `finally` so the button re-enables.
- */
+function mapApiError(err: ApiError): PlaceOrderError {
+  const message = err.message;
+  switch (err.status) {
+    case 422:
+      return { kind: 'no_username', message };
+    case 403:
+      return { kind: 'forbidden', message };
+    case 404:
+      return { kind: 'shop_rotated', message };
+    case 409: {
+      const balance = typeof err.body.balance === 'number' ? err.body.balance : 0;
+      const cost = typeof err.body.cost === 'number' ? err.body.cost : 0;
+      return { kind: 'insufficient', message, balance, cost };
+    }
+    default:
+      return { kind: 'transient', message };
+  }
+}
+
 export function usePlaceOrder(skinId: string): UsePlaceOrderResult {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<PlaceOrderError | null>(null);
   const [success, setSuccess] = useState<PlaceOrderSuccess | null>(null);
-  const router = useRouter();
 
   async function placeOrder() {
     setLoading(true);
@@ -43,33 +56,18 @@ export function usePlaceOrder(skinId: string): UsePlaceOrderResult {
     setSuccess(null);
 
     try {
-      const res = await fetch('/api/orders', {
+      const body = await apiFetch<PlaceOrderSuccess>('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skinId }),
       });
-      
-      if (res.status === 401) {
-        router.push(`/sign-in?redirect_url=${encodeURIComponent(window.location.pathname)}`);
-        return;
-      }
-
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(
-          typeof body?.error === 'string' ? body.error : 'Поръчката не успя',
-        );
-      }
-
-      setSuccess({
-        orderId: body.orderId,
-        skinName: body.skinName,
-        vbucksCost: body.vbucksCost,
-        remainingBalance: body.remainingBalance,
-      });
+      setSuccess(body);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Поръчката не успя');
+      if (e instanceof ApiError) {
+        setError(mapApiError(e));
+      } else {
+        setError({ kind: 'transient', message: 'Поръчката не успя' });
+      }
     } finally {
       setLoading(false);
     }

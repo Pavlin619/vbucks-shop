@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { Check, Lock, Loader2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import Alert from '@/components/ui/Alert';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { useSaveUsername } from '@/app/(shop)/cart/_lib/use-save-username';
+import { useSaveFortniteUsername } from '@/lib/hooks/use-save-fortnite-username';
+import type { CheckoutError } from '@/app/(shop)/cart/_lib/use-checkout';
 
 type StepStatus = 'completed' | 'active' | 'locked';
 
@@ -70,7 +72,7 @@ interface PurchaseStepsProps {
   fortniteUsername: string | null;
   onCheckout: () => void;
   checkoutLoading: boolean;
-  checkoutError: string | null;
+  checkoutError: CheckoutError | null;
 }
 
 export default function PurchaseSteps({
@@ -81,7 +83,7 @@ export default function PurchaseSteps({
   checkoutError,
 }: PurchaseStepsProps) {
   const [usernameInput, setUsernameInput] = useState('');
-  const { saving, error: saveError, saveUsername } = useSaveUsername();
+  const { saving, error: saveError, saveUsername } = useSaveFortniteUsername();
 
   const step1Status: StepStatus = isAuthenticated ? 'completed' : 'active';
   const step2Status: StepStatus = fortniteUsername
@@ -158,9 +160,9 @@ export default function PurchaseSteps({
               </Button>
             </div>
             {saveError && (
-              <p className="mt-2 text-xs text-red-400" role="alert">
+              <Alert variant="error" className="mt-2 text-xs">
                 {saveError}
-              </p>
+              </Alert>
             )}
           </div>
         )}
@@ -170,10 +172,36 @@ export default function PurchaseSteps({
         <p className="mt-1 text-sm text-brand-muted">
           Плати с карта и V-Bucks ще бъдат добавени веднага към баланса ти.
         </p>
-        {checkoutError && (
-          <p className="mt-2 text-sm text-red-400" role="alert">
-            {checkoutError}
-          </p>
+        {checkoutError?.kind === 'no_username' && (
+          <Alert
+            variant="warning"
+            className="mt-2 text-xs"
+            action={
+              <Button as="link" href="/profile" size="sm" variant="secondary">
+                Профил
+              </Button>
+            }
+          >
+            Задайте Fortnite потребителско име преди да продължите.
+          </Alert>
+        )}
+        {checkoutError?.kind === 'invalid_cart' && (
+          <Alert variant="warning" className="mt-2 text-xs">
+            {checkoutError.message}. Премахнете и добавете отново артикула.
+          </Alert>
+        )}
+        {checkoutError?.kind === 'transient' && (
+          <Alert
+            variant="error"
+            className="mt-2 text-xs"
+            action={
+              <Button size="sm" onClick={onCheckout} disabled={checkoutLoading}>
+                Опитайте отново
+              </Button>
+            }
+          >
+            Неуспешно плащане. Моля, опитайте отново.
+          </Alert>
         )}
         <div className="mt-3">
           <Button
