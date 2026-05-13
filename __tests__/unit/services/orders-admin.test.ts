@@ -53,7 +53,8 @@ describe('services/orders — getPendingOrders', () => {
 
     const result = await getPendingOrders();
 
-    expect(result).toEqual([]);
+    expect(result.dbError).toBe(false);
+    expect(result.data).toEqual([]);
   });
 
   it('joins pending orders with fortnite_username from profiles', async () => {
@@ -83,8 +84,9 @@ describe('services/orders — getPendingOrders', () => {
 
     const result = await getPendingOrders();
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
+    expect(result.dbError).toBe(false);
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]).toMatchObject({
       id: 'order_1',
       skin_name: 'Ravenpool',
       status: 'pending',
@@ -116,7 +118,7 @@ describe('services/orders — getPendingOrders', () => {
 
     const result = await getPendingOrders();
 
-    expect(result[0].fortnite_username).toBeNull();
+    expect(result.data[0].fortnite_username).toBeNull();
   });
 
   it('returns empty array and logs error on DB failure', async () => {
@@ -129,7 +131,8 @@ describe('services/orders — getPendingOrders', () => {
 
     const result = await getPendingOrders();
 
-    expect(result).toEqual([]);
+    expect(result.dbError).toBe(true);
+    expect(result.data).toEqual([]);
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });

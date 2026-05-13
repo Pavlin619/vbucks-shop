@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@clerk/nextjs/server', () => {
   const protect = vi.fn();
@@ -17,8 +17,10 @@ import { PATCH } from '@/app/api/admin/orders/[orderId]/route';
 const mockAuthProtect = vi.mocked(auth.protect);
 const mockFulfillOrder = vi.mocked(fulfillOrder);
 
-const ADMIN_ID = 'admin_user_123';
 const ORDER_ID = 'order_uuid_456';
+
+const adminClaims = { sessionClaims: { metadata: { role: 'admin' } } };
+const userClaims = { sessionClaims: { metadata: {} } };
 
 const makeRequest = (body: unknown) =>
   new Request(`http://localhost/api/admin/orders/${ORDER_ID}`, {
@@ -33,10 +35,7 @@ const makeParams = (orderId: string = ORDER_ID) =>
 describe('PATCH /api/admin/orders/[orderId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('ADMIN_USER_IDS', ADMIN_ID);
   });
-
-  afterEach(() => vi.unstubAllEnvs());
 
   it('rejects unauthenticated requests via auth.protect', async () => {
     mockAuthProtect.mockRejectedValue(new Error('NEXT_NOT_FOUND'));
@@ -50,7 +49,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 403 when the authenticated user is not an admin', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: 'regular_user_999' } as never);
+    mockAuthProtect.mockResolvedValue(userClaims as never);
 
     const res = await PATCH(makeRequest({ status: 'gifted' }), {
       params: makeParams(),
@@ -63,7 +62,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 400 when the body is not valid JSON', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: ADMIN_ID } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
 
     const res = await PATCH(
       new Request(`http://localhost/api/admin/orders/${ORDER_ID}`, {
@@ -79,7 +78,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 400 when status is not gifted or refunded', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: ADMIN_ID } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
 
     const res = await PATCH(makeRequest({ status: 'cancelled' }), {
       params: makeParams(),
@@ -92,7 +91,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 404 when order does not exist', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: ADMIN_ID } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockFulfillOrder.mockRejectedValue(new Error('Order not found'));
 
     const res = await PATCH(makeRequest({ status: 'gifted' }), {
@@ -105,7 +104,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 409 when order is not pending', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: ADMIN_ID } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockFulfillOrder.mockRejectedValue(new Error('Order is not pending'));
 
     const res = await PATCH(makeRequest({ status: 'refunded' }), {
@@ -118,7 +117,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 200 and delegates to fulfillOrder for gifted action', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: ADMIN_ID } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockFulfillOrder.mockResolvedValue(undefined);
 
     const res = await PATCH(makeRequest({ status: 'gifted' }), {
@@ -132,7 +131,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 200 and delegates to fulfillOrder for refunded action', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: ADMIN_ID } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockFulfillOrder.mockResolvedValue(undefined);
 
     const res = await PATCH(makeRequest({ status: 'refunded' }), {
@@ -146,7 +145,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
   });
 
   it('returns 500 for unexpected errors', async () => {
-    mockAuthProtect.mockResolvedValue({ userId: ADMIN_ID } as never);
+    mockAuthProtect.mockResolvedValue(adminClaims as never);
     mockFulfillOrder.mockRejectedValue(new Error('Unexpected DB failure'));
 
     const res = await PATCH(makeRequest({ status: 'gifted' }), {

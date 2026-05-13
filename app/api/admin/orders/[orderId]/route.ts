@@ -5,20 +5,13 @@ import { fulfillOrder } from '@/services/orders';
 type OrderAction = 'gifted' | 'refunded';
 const VALID_ACTIONS: OrderAction[] = ['gifted', 'refunded'];
 
-function getAdminUserIds(): string[] {
-  return (process.env.ADMIN_USER_IDS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ orderId: string }> },
 ) {
-  const { userId } = await auth.protect();
+  const { sessionClaims } = await auth.protect();
 
-  if (!getAdminUserIds().includes(userId)) {
+  if (sessionClaims?.metadata?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

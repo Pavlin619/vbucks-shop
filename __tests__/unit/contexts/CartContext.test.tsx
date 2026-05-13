@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { CartProvider, useCart } from '@/contexts/CartContext';
+import { ToastProvider } from '@/contexts/ToastContext';
 import { storageKey } from '@/contexts/_lib/cart-storage';
 
 vi.mock('@clerk/nextjs', () => ({
@@ -19,7 +20,9 @@ const asUser = (id: string) =>
   mockUseUser.mockReturnValue({ user: { id }, isLoaded: true } as unknown as ReturnType<typeof useUser>);
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <CartProvider>{children}</CartProvider>
+  <ToastProvider>
+    <CartProvider>{children}</CartProvider>
+  </ToastProvider>
 );
 
 describe('CartContext', () => {

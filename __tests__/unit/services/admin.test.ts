@@ -38,7 +38,7 @@ describe('services/admin — getRecentVBucksPurchasers', () => {
 
     const result = await getRecentVBucksPurchasers();
 
-    expect(result).toEqual({ data: [], total: 0 });
+    expect(result).toMatchObject({ data: [], total: 0, dbError: false });
   });
 
   it('returns mapped purchasers joined with profile data', async () => {
@@ -98,7 +98,7 @@ describe('services/admin — getRecentVBucksPurchasers', () => {
 
     const result = await getRecentVBucksPurchasers();
 
-    expect(result).toEqual({ data: [], total: 0 });
+    expect(result).toMatchObject({ data: [], total: 0, dbError: true });
   });
 });
 

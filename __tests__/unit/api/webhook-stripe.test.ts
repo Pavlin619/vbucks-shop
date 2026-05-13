@@ -119,6 +119,7 @@ describe('POST /api/webhooks/stripe', () => {
       p_session_id: 'cs_test_abc123',
       p_vbucks: 1500,
       p_amount_cents: 798,
+      p_payment_intent_id: null,
     });
   });
 
@@ -143,10 +144,11 @@ describe('POST /api/webhooks/stripe', () => {
       p_session_id: 'cs_test_no_packid',
       p_vbucks: 500,
       p_amount_cents: 299,
+      p_payment_intent_id: null,
     });
   });
 
-  it('returns 200 (no-op) when userId or vbucks metadata is missing', async () => {
+  it('returns 500 when userId or vbucks metadata is missing (triggers Stripe retry)', async () => {
     mockConstructEvent.mockReturnValue({
       type: 'checkout.session.completed',
       data: {
@@ -160,11 +162,11 @@ describe('POST /api/webhooks/stripe', () => {
 
     const res = await POST(makeRequest());
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it('returns 200 (no-op) when vbucks metadata is not a positive integer', async () => {
+  it('returns 500 when vbucks metadata is not a positive integer (triggers Stripe retry)', async () => {
     mockConstructEvent.mockReturnValue({
       type: 'checkout.session.completed',
       data: {
@@ -178,7 +180,7 @@ describe('POST /api/webhooks/stripe', () => {
 
     const res = await POST(makeRequest());
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 

@@ -8,6 +8,7 @@ const STATUS_ORDER: Record<FriendRequestStatus, number> = { not_sent: 0, pending
 export interface PurchasersPage {
   data: PurchaserWithStatus[];
   total: number;
+  dbError: boolean;
 }
 
 export async function getRecentVBucksPurchasers({
@@ -25,10 +26,10 @@ export async function getRecentVBucksPurchasers({
 
   if (purchasesError) {
     console.error('[services/admin] getRecentVBucksPurchasers failed', purchasesError.message);
-    return { data: [], total: 0 };
+    return { data: [], total: 0, dbError: true };
   }
 
-  if (!purchases || purchases.length === 0) return { data: [], total: count ?? 0 };
+  if (!purchases || purchases.length === 0) return { data: [], total: count ?? 0, dbError: false };
 
   const userIds = [...new Set(purchases.map((p: { user_id: string }) => p.user_id))];
 
@@ -39,7 +40,7 @@ export async function getRecentVBucksPurchasers({
 
   if (profilesError) {
     console.error('[services/admin] profiles fetch failed', profilesError.message);
-    return { data: [], total: count ?? 0 };
+    return { data: [], total: count ?? 0, dbError: true };
   }
 
   const profileMap = new Map(
@@ -84,10 +85,13 @@ export async function getRecentVBucksPurchasers({
     },
   );
 
-  return { data, total: count ?? data.length };
+  return { data, total: count ?? data.length, dbError: false };
 }
 
-export async function getFriendRequestQueue(): Promise<FriendRequestEntry[]> {
+export async function getFriendRequestQueue(): Promise<{
+  data: FriendRequestEntry[];
+  dbError: boolean;
+}> {
   const { data: profiles, error } = await supabaseAdmin
     .from('profiles')
     .select('id, fortnite_username, phone_number, friend_request_status, friend_request_accepted_at, fortnite_username_set_at')
@@ -95,10 +99,10 @@ export async function getFriendRequestQueue(): Promise<FriendRequestEntry[]> {
 
   if (error) {
     console.error('[services/admin] getFriendRequestQueue failed', error.message);
-    return [];
+    return { data: [], dbError: true };
   }
 
-  if (!profiles || profiles.length === 0) return [];
+  if (!profiles || profiles.length === 0) return { data: [], dbError: false };
 
   const userIds = profiles.map((p: { id: string }) => p.id);
 
@@ -136,7 +140,48 @@ export async function getFriendRequestQueue(): Promise<FriendRequestEntry[]> {
     return b.username_set_at.localeCompare(a.username_set_at);
   });
 
-  return data;
+  return { data, dbError: false };
+}
+
+export interface FlaggedAccount {
+  user_id: string;
+  fortnite_username: string | null;
+  phone_number: string | null;
+}
+
+export async function getFlaggedAccounts(): Promise<{ data: FlaggedAccount[]; dbError: boolean }> {
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id, fortnite_username, phone_number')
+    .eq('is_flagged', true)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('[services/admin] getFlaggedAccounts failed', error.message);
+    return { data: [], dbError: true };
+  }
+
+  return {
+    data: (data ?? []).map((p: { id: string; fortnite_username: string | null; phone_number: string | null }) => ({
+      user_id: p.id,
+      fortnite_username: p.fortnite_username,
+      phone_number: p.phone_number,
+    })),
+    dbError: false,
+  };
+}
+
+export async function getFailedNotificationsCount(): Promise<number> {
+  const { count, error } = await supabaseAdmin
+    .from('failed_notifications')
+    .select('id', { count: 'exact', head: true })
+    .is('retried_at', null);
+
+  if (error) {
+    console.error('[services/admin] getFailedNotificationsCount failed', error.message);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 export async function updateFriendRequestStatus(

@@ -3,12 +3,17 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { getRequiredEnv } from '@/lib/env';
-import { creditPurchase } from '@/services/purchases';
+import { creditPurchase, flagAccountByPaymentIntent } from '@/services/purchases';
 import { getProfile } from '@/services/wallet';
-import { sendVBucksPurchaseNotificationToAdmin } from '@/services/email';
+import { sendVBucksPurchaseNotificationToAdmin, sendAccountFlaggedNotificationToAdmin } from '@/services/email';
 
 // Must be disabled so Next.js gives us the raw body for signature verification.
 export const dynamic = 'force-dynamic';
+
+const CHARGEBACK_EVENTS = new Set([
+  'charge.refunded',
+  'charge.dispute.funds_withdrawn',
+]);
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -34,38 +39,74 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  if (event.type !== 'checkout.session.completed') {
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const result = await creditPurchase(session);
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.reason }, { status: 500 });
+    }
+
+    if (result.status === 'credited') {
+      const userId = session.metadata?.userId;
+      const vbucksAmount = Number.parseInt(session.metadata?.vbucks ?? '0', 10);
+      const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (userId && vbucksAmount > 0 && adminEmails.length > 0) {
+        getProfile(userId)
+          .then((profile) =>
+            sendVBucksPurchaseNotificationToAdmin(
+              adminEmails,
+              profile.fortnite_username ?? userId,
+              vbucksAmount,
+            ),
+          )
+          .catch((err) =>
+            console.error('[stripe webhook] admin email notification failed', err),
+          );
+      }
+    }
+
     return NextResponse.json({ received: true });
   }
 
-  const session = event.data.object as Stripe.Checkout.Session;
-  const result = await creditPurchase(session);
+  if (CHARGEBACK_EVENTS.has(event.type)) {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId =
+      typeof charge.payment_intent === 'string' ? charge.payment_intent : null;
 
-  if (!result.ok) {
-    return NextResponse.json({ error: 'DB error' }, { status: 500 });
-  }
-
-  if (result.status === 'credited') {
-    const userId = session.metadata?.userId;
-    const vbucksAmount = Number.parseInt(session.metadata?.vbucks ?? '0', 10);
-    const adminEmails = (process.env.ADMIN_EMAILS ?? '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    if (userId && vbucksAmount > 0 && adminEmails.length > 0) {
-      getProfile(userId)
-        .then((profile) =>
-          sendVBucksPurchaseNotificationToAdmin(
-            adminEmails,
-            profile.fortnite_username ?? userId,
-            vbucksAmount,
-          ),
-        )
-        .catch((err) =>
-          console.error('[stripe webhook] admin email notification failed', err),
-        );
+    if (!paymentIntentId) {
+      console.error('[stripe webhook] chargeback event missing payment_intent', event.id);
+      return NextResponse.json({ received: true });
     }
+
+    const flagResult = await flagAccountByPaymentIntent(paymentIntentId);
+
+    if (!flagResult.ok && flagResult.reason === 'DB_ERROR') {
+      return NextResponse.json({ error: 'DB_ERROR' }, { status: 500 });
+    }
+
+    if (flagResult.ok) {
+      const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (adminEmails.length > 0) {
+        sendAccountFlaggedNotificationToAdmin(
+          adminEmails,
+          paymentIntentId,
+          `Stripe event: ${event.type}`,
+        ).catch((err) =>
+          console.error('[stripe webhook] chargeback email notification failed', err),
+        );
+      }
+    }
+
+    return NextResponse.json({ received: true });
   }
 
   return NextResponse.json({ received: true });
