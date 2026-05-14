@@ -6,6 +6,7 @@ import { useSaveFortniteUsername } from '@/lib/hooks/use-save-fortnite-username'
 import { isValidFortniteUsername, FORTNITE_USERNAME_ERROR } from '@/lib/fortnite-username';
 import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 
 const DEBOUNCE_MS = 500;
 
@@ -32,6 +33,8 @@ export default function FortniteUsernameForm() {
   }
 
   return (
+    <>
+    <LoadingOverlay visible={saving} />
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label
@@ -85,5 +88,6 @@ export default function FortniteUsernameForm() {
         {saving ? 'Запазване...' : 'Запази'}
       </Button>
     </form>
+    </>
   );
 }

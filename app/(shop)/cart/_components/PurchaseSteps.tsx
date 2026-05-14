@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Check, Lock, Loader2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import Alert from '@/components/ui/Alert';
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { useSaveFortniteUsername } from '@/lib/hooks/use-save-fortnite-username';
@@ -95,6 +96,8 @@ export default function PurchaseSteps({
     isAuthenticated && !!fortniteUsername ? 'active' : 'locked';
 
   return (
+    <>
+    <LoadingOverlay visible={checkoutLoading || saving} />
     <Card variant="highlight" className="mb-6" data-testid="purchase-steps">
       <h2 className="text-base font-bold text-brand-text mb-5">Как работи покупката</h2>
 
@@ -222,5 +225,6 @@ export default function PurchaseSteps({
         </div>
       </Step>
     </Card>
+    </>
   );
 }

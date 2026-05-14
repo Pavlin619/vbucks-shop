@@ -10,6 +10,7 @@ import ConfirmBuyModal from '@/app/(shop)/item-shop/[offerId]/_components/Confir
 import InsufficientBalanceModal from '@/app/(shop)/item-shop/[offerId]/_components/InsufficientBalanceModal';
 import ShopRotatedModal from '@/app/(shop)/item-shop/[offerId]/_components/ShopRotatedModal';
 import { usePlaceOrder } from '@/app/(shop)/item-shop/[offerId]/_lib/use-place-order';
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 
 interface BuyFlowProps {
   skinId: string;
@@ -52,6 +53,7 @@ export default function BuyFlow({
 
   return (
     <>
+      <LoadingOverlay visible={loading} />
       {showConfirm && (
         <ConfirmBuyModal
           skinName={skinName}
