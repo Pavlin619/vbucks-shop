@@ -1,10 +1,12 @@
 import { auth } from '@clerk/nextjs/server';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import ShopGrid from '@/app/(shop)/item-shop/_components/ShopGrid';
+import ShopGridClient from '@/app/(shop)/item-shop/_components/ShopGridClient';
+import ShopRefreshButton from '@/app/(shop)/item-shop/_components/ShopRefreshButton';
 import ItemShopAccessGate from '@/app/(shop)/item-shop/_components/ItemShopAccessGate';
+import EmptyState from '@/components/ui/EmptyState';
 import { getProfile } from '@/services/wallet';
-import { fetchShopEntries } from '@/services/skins';
+import { fetchShopEntries, groupByLayout } from '@/services/skins';
 import { canAccessItemShop } from '@/services/access-gate';
 
 export const metadata = {
@@ -20,6 +22,7 @@ export default async function ItemShopPage() {
   const gate = canAccessItemShop(profile);
 
   const entries = await fetchShopEntries();
+  const sections = groupByLayout(entries);
 
   return (
     <>
@@ -38,7 +41,15 @@ export default async function ItemShopPage() {
 
           {!gate.allowed && <ItemShopAccessGate gate={gate} className="mb-8" />}
 
-          <ShopGrid entries={entries} />
+          {entries.length === 0 ? (
+            <EmptyState
+              message="Магазинът на Fortnite временно не е достъпен. Опитайте отново след малко."
+              testId="shop-empty"
+              action={<ShopRefreshButton />}
+            />
+          ) : (
+            <ShopGridClient sections={sections} />
+          )}
         </div>
       </main>
       <Footer />
