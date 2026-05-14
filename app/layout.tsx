@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { CartProvider } from "@/contexts/CartContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import ToastViewport from "@/components/ui/ToastViewport";
+import CookieBanner from "@/components/ui/CookieBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -37,6 +38,7 @@ export default function RootLayout({
             <CartProvider>{children}</CartProvider>
             <ToastViewport />
           </ToastProvider>
+          <CookieBanner />
         </body>
       </html>
     </ClerkProvider>
