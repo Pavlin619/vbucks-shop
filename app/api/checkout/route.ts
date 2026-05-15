@@ -2,12 +2,18 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createCheckoutSession } from '@/services/checkout';
 import { getProfile } from '@/services/wallet';
+import { checkoutLimiter } from '@/lib/rate-limit';
 
 export async function POST(req: Request) {
   // Middleware already gates unauthenticated callers with a 401. The
   // call here is defence-in-depth and narrows `userId` to a non-null
   // string for the rest of the handler.
   const { userId } = await auth.protect();
+
+  const { success } = await checkoutLimiter().limit(userId);
+  if (!success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
 
   const profile = await getProfile(userId);
   if (!profile.fortnite_username || profile.fortnite_username.trim() === '') {

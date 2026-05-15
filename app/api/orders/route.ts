@@ -6,9 +6,15 @@ import {
   sendOrderPlacedNotificationToAdmin,
   sendSkinOrderConfirmationToCustomer,
 } from '@/services/email';
+import { ordersLimiter } from '@/lib/rate-limit';
 
 export async function POST(req: Request) {
   const { userId } = await auth.protect();
+
+  const { success } = await ordersLimiter().limit(userId);
+  if (!success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
 
   let body: unknown;
   try {
