@@ -2,16 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ShoppingCart, Zap, Menu, X, CircleUser, ShieldCheck } from 'lucide-react';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useCart } from '@/contexts/CartContext';
 import Button from '@/components/ui/Button';
 
 const NAV_LINKS = [
-  { label: 'Fortnite', href: '#fortnite' },
+  { label: 'Fortnite', href: '#packages' },
   { label: 'Item Shop', href: '/item-shop' },
-  { label: 'Xbox', href: '#xbox' },
-  { label: 'Roblox', href: '#roblox' },
   { label: 'Как Работи', href: '#how-it-works' },
 ];
 
@@ -21,6 +20,13 @@ export default function Header() {
   const { isSignedIn } = useUser();
   const { sessionClaims } = useAuth();
   const isAdmin = sessionClaims?.metadata?.role === 'admin';
+  const pathname = usePathname();
+
+  function resolveHref(href: string) {
+    if (!href.startsWith('#')) return href;
+    // When not on the home page, prepend / so the browser navigates home first
+    return pathname === '/' ? href : `/${href}`;
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -36,13 +42,13 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center gap-8">
           {NAV_LINKS.map((link) => (
-            <a
+            <Link
               key={link.href}
-              href={link.href}
+              href={resolveHref(link.href)}
               className="text-sm text-brand-text transition-colors hover:text-brand-accent"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -105,14 +111,14 @@ export default function Header() {
       {mobileOpen && (
         <div className="md:hidden px-4 pb-4 flex flex-col gap-3 bg-brand-overlay">
           {NAV_LINKS.map((link) => (
-            <a
+            <Link
               key={link.href}
-              href={link.href}
+              href={resolveHref(link.href)}
               className="py-2 text-sm text-brand-text transition-colors hover:text-brand-accent"
               onClick={() => setMobileOpen(false)}
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </div>
       )}
