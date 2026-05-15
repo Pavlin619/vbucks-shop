@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('@/lib/rate-limit', () => ({
+  checkoutLimiter: () => ({ limit: vi.fn().mockResolvedValue({ success: true }) }),
+}));
+
 vi.mock('@clerk/nextjs/server', () => {
   const protect = vi.fn();
   const authFn = Object.assign(vi.fn(), { protect });

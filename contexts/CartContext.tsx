@@ -76,6 +76,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       saveToStorage(null, []);
     }
 
+    // Syncing from localStorage (an external system) when auth state changes is
+    // exactly what this effect is for; the rule is overly broad here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setItems(valid);
   }, [userId, push]);
 
