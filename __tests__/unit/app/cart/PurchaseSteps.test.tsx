@@ -192,7 +192,7 @@ describe('PurchaseSteps', () => {
       expect(screen.queryByTestId('fortnite-username-input')).toBeNull();
     });
 
-    it('checkout button is enabled', () => {
+    it('checkout button is enabled after accepting both checkboxes', async () => {
       render(
         <PurchaseSteps
           isAuthenticated={true}
@@ -203,11 +203,14 @@ describe('PurchaseSteps', () => {
         />,
       );
 
+      await userEvent.click(screen.getByTestId('terms-checkbox'));
+      await userEvent.click(screen.getByTestId('digital-waiver-checkbox'));
+
       const btn = screen.getByTestId('checkout-btn') as HTMLButtonElement;
       expect(btn.disabled).toBe(false);
     });
 
-    it('calls onCheckout when checkout button is clicked', async () => {
+    it('calls onCheckout when checkout button is clicked after accepting checkboxes', async () => {
       const onCheckout = vi.fn();
 
       render(
@@ -220,6 +223,8 @@ describe('PurchaseSteps', () => {
         />,
       );
 
+      await userEvent.click(screen.getByTestId('terms-checkbox'));
+      await userEvent.click(screen.getByTestId('digital-waiver-checkbox'));
       await userEvent.click(screen.getByTestId('checkout-btn'));
       expect(onCheckout).toHaveBeenCalledTimes(1);
     });

@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('@/lib/rate-limit', () => ({
+  ordersLimiter: () => ({ limit: vi.fn().mockResolvedValue({ success: true }) }),
+}));
+
 vi.mock('@clerk/nextjs/server', () => {
   const protect = vi.fn();
   const authFn = Object.assign(vi.fn(), { protect });
-  return { auth: authFn };
+  const clerkClientFn = vi.fn().mockResolvedValue({
+    users: {
+      getUser: vi.fn().mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'user@example.com' }],
+      }),
+    },
+  });
+  return { auth: authFn, clerkClient: clerkClientFn };
 });
 
 vi.mock('@/services/orders', () => ({
@@ -12,6 +23,7 @@ vi.mock('@/services/orders', () => ({
 
 vi.mock('@/services/email', () => ({
   sendOrderPlacedNotificationToAdmin: vi.fn().mockResolvedValue(undefined),
+  sendSkinOrderConfirmationToCustomer: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { auth } from '@clerk/nextjs/server';

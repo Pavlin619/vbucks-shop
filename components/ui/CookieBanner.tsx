@@ -1,19 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
 
 const STORAGE_KEY = 'cookie-notice-dismissed';
 
 export default function CookieBanner() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setVisible(true);
-    }
-  }, []);
+  // Lazy initializer: reads localStorage once on mount (server returns false,
+  // client hydrates with the real value — no extra render, no flash).
+  const [visible, setVisible] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return !localStorage.getItem(STORAGE_KEY);
+  });
 
   function dismiss() {
     localStorage.setItem(STORAGE_KEY, '1');

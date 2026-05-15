@@ -127,7 +127,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ ok: true });
-    expect(mockFulfillOrder).toHaveBeenCalledWith(ORDER_ID, 'gifted');
+    expect(mockFulfillOrder).toHaveBeenCalledWith(ORDER_ID, 'gifted', expect.any(Function));
   });
 
   it('returns 200 and delegates to fulfillOrder for refunded action', async () => {
@@ -141,7 +141,7 @@ describe('PATCH /api/admin/orders/[orderId]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ ok: true });
-    expect(mockFulfillOrder).toHaveBeenCalledWith(ORDER_ID, 'refunded');
+    expect(mockFulfillOrder).toHaveBeenCalledWith(ORDER_ID, 'refunded', expect.any(Function));
   });
 
   it('returns 500 for unexpected errors', async () => {
