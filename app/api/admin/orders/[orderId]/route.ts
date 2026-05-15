@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { fulfillOrder } from '@/services/orders';
 
 type OrderAction = 'gifted' | 'refunded';
@@ -30,7 +31,7 @@ export async function PATCH(
   const { orderId } = await params;
 
   try {
-    await fulfillOrder(orderId, action as OrderAction);
+    await fulfillOrder(orderId, action as OrderAction, waitUntil);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : '';

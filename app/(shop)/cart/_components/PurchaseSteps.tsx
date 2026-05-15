@@ -84,6 +84,8 @@ export default function PurchaseSteps({
   checkoutError,
 }: PurchaseStepsProps) {
   const [usernameInput, setUsernameInput] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [digitalWaiverAccepted, setDigitalWaiverAccepted] = useState(false);
   const { saving, error: saveError, saveUsername } = useSaveFortniteUsername();
 
   const step1Status: StepStatus = isAuthenticated ? 'completed' : 'active';
@@ -206,11 +208,65 @@ export default function PurchaseSteps({
             Неуспешно плащане. Моля, опитайте отново.
           </Alert>
         )}
+        {step3Status === 'active' && (
+          <div className="mt-4 space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 flex-shrink-0 accent-brand-accent cursor-pointer"
+                data-testid="terms-checkbox"
+              />
+              <span className="text-xs text-brand-muted leading-relaxed group-hover:text-brand-text transition-colors">
+                Прочел/а съм и приемам{' '}
+                <a
+                  href="/terms-of-use"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-accent hover:text-brand-accent-hover underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Условията за Ползване
+                </a>{' '}
+                и{' '}
+                <a
+                  href="/privacy-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-accent hover:text-brand-accent-hover underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Политиката за Поверителност
+                </a>
+                .
+              </span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={digitalWaiverAccepted}
+                onChange={(e) => setDigitalWaiverAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 flex-shrink-0 accent-brand-accent cursor-pointer"
+                data-testid="digital-waiver-checkbox"
+              />
+              <span className="text-xs text-brand-muted leading-relaxed group-hover:text-brand-text transition-colors">
+                Разбирам, че V-Bucks са цифрово съдържание с незабавно изпълнение — с което губя
+                правото си на отказ съгласно чл. 57, ал. 1, т. 13 ЗЗП.
+              </span>
+            </label>
+          </div>
+        )}
         <div className="mt-3">
           <Button
             fullWidth
             onClick={onCheckout}
-            disabled={checkoutLoading || step3Status === 'locked'}
+            disabled={
+              checkoutLoading ||
+              step3Status === 'locked' ||
+              !termsAccepted ||
+              !digitalWaiverAccepted
+            }
             data-testid="checkout-btn"
           >
             {checkoutLoading ? (

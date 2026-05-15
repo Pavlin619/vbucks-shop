@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { updateFortniteUsername } from '@/services/wallet';
 import { sendFriendRequestNeededNotificationToAdmin } from '@/services/email';
 import { isValidFortniteUsername } from '@/lib/fortnite-username';
@@ -34,8 +35,10 @@ export async function PUT(req: Request) {
     .filter(Boolean);
 
   if (adminEmails.length > 0) {
-    sendFriendRequestNeededNotificationToAdmin(adminEmails, username).catch((err) =>
-      console.error('[api/profile/fortnite-username] notification failed', err),
+    waitUntil(
+      sendFriendRequestNeededNotificationToAdmin(adminEmails, username).catch((err) =>
+        console.error('[api/profile/fortnite-username] notification failed', err),
+      ),
     );
   }
 
