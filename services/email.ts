@@ -14,6 +14,23 @@ async function recordFailedNotification(recipient: string, subject: string): Pro
   }
 }
 
+async function sendToCustomer(
+  customerEmail: string,
+  subject: string,
+  html: string,
+): Promise<void> {
+  try {
+    const { error } = await resend.emails.send({ from: FROM, to: customerEmail, subject, html });
+    if (error) {
+      console.error('[services/email] customer send failed', { to: customerEmail, subject, error });
+      await recordFailedNotification(customerEmail, subject);
+    }
+  } catch (err) {
+    console.error('[services/email] customer send failed', { to: customerEmail, subject, err });
+    await recordFailedNotification(customerEmail, subject);
+  }
+}
+
 async function sendToAdmins(
   adminEmails: string[],
   subject: string,
@@ -108,5 +125,55 @@ export async function sendAccountFlaggedNotificationToAdmin(
     `<p><strong>Account flagged:</strong> <code>${esc(userIdentifier)}</code></p>
      <p><strong>Reason:</strong> ${esc(reason)}</p>
      <p>Please review this account in the admin panel and take appropriate action.</p>`,
+  );
+}
+
+export async function sendVBucksConfirmationToCustomer(
+  customerEmail: string,
+  vbucksAmount: number,
+  amountCents: number,
+): Promise<void> {
+  const price = `€${(amountCents / 100).toFixed(2).replace('.', ',')}`;
+  await sendToCustomer(
+    customerEmail,
+    `[VBucks Shop] Потвърждение — ${vbucksAmount.toLocaleString('bg-BG')} V-Bucks`,
+    `<p>Здравейте,</p>
+     <p>Потвърждаваме, че Вашата покупка е обработена успешно.</p>
+     <ul>
+       <li><strong>V-Bucks:</strong> ${vbucksAmount.toLocaleString('bg-BG')} V-Bucks</li>
+       <li><strong>Платена сума:</strong> ${esc(price)} (вкл. 20% ДДС)</li>
+     </ul>
+     <p>V-Bucks са добавени към баланса Ви и можете да ги използвате за покупка на скинове от Item Shop.</p>
+     <p>За въпроси или проблеми се свържете с нас на
+       <a href="mailto:jasonbourne@promociika.com">jasonbourne@promociika.com</a>.
+     </p>
+     <p>С уважение,<br/>Екипът на VBucks Shop</p>`,
+  );
+}
+
+export async function sendSkinOrderConfirmationToCustomer(
+  customerEmail: string,
+  skinName: string,
+  vbucksCost: number,
+  orderId: string,
+  remainingBalance: number,
+): Promise<void> {
+  await sendToCustomer(
+    customerEmail,
+    `[VBucks Shop] Поръчка приета — ${esc(skinName)}`,
+    `<p>Здравейте,</p>
+     <p>Вашата поръчка е приета успешно.</p>
+     <ul>
+       <li><strong>Скин:</strong> ${esc(skinName)}</li>
+       <li><strong>Цена:</strong> ${vbucksCost.toLocaleString('bg-BG')} V-Bucks</li>
+       <li><strong>Номер на поръчката:</strong> ${esc(orderId)}</li>
+       <li><strong>Оставащ баланс:</strong> ${remainingBalance.toLocaleString('bg-BG')} V-Bucks</li>
+     </ul>
+     <p>Администратор ще Ви подари скина в играта в рамките на 24 часа.
+        Моля, уверете се, че сте приели поканата за приятелство в Fortnite.</p>
+     <p>За въпроси или проблеми се свържете с нас на
+       <a href="mailto:jasonbourne@promociika.com">jasonbourne@promociika.com</a>.
+     </p>
+     <p>С уважение,<br/>Екипът на VBucks Shop</p>`,
   );
 }

@@ -1,11 +1,16 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { getRequiredEnv } from '@/lib/env';
 import { creditPurchase, flagAccountByPaymentIntent } from '@/services/purchases';
 import { getProfile } from '@/services/wallet';
-import { sendVBucksPurchaseNotificationToAdmin, sendAccountFlaggedNotificationToAdmin } from '@/services/email';
+import {
+  sendVBucksPurchaseNotificationToAdmin,
+  sendAccountFlaggedNotificationToAdmin,
+  sendVBucksConfirmationToCustomer,
+} from '@/services/email';
 
 // Must be disabled so Next.js gives us the raw body for signature verification.
 export const dynamic = 'force-dynamic';
@@ -50,23 +55,38 @@ export async function POST(req: Request) {
     if (result.status === 'credited') {
       const userId = session.metadata?.userId;
       const vbucksAmount = Number.parseInt(session.metadata?.vbucks ?? '0', 10);
+      const amountCents = session.amount_total ?? 0;
+      const customerEmail = session.customer_details?.email ?? null;
       const adminEmails = (process.env.ADMIN_EMAILS ?? '')
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
 
-      if (userId && vbucksAmount > 0 && adminEmails.length > 0) {
-        getProfile(userId)
-          .then((profile) =>
-            sendVBucksPurchaseNotificationToAdmin(
-              adminEmails,
-              profile.fortnite_username ?? userId,
-              vbucksAmount,
+      if (userId && vbucksAmount > 0) {
+        waitUntil(
+          getProfile(userId)
+            .then(async (profile) => {
+              const notifs: Promise<void>[] = [];
+              if (adminEmails.length > 0) {
+                notifs.push(
+                  sendVBucksPurchaseNotificationToAdmin(
+                    adminEmails,
+                    profile.fortnite_username ?? userId,
+                    vbucksAmount,
+                  ),
+                );
+              }
+              if (customerEmail) {
+                notifs.push(
+                  sendVBucksConfirmationToCustomer(customerEmail, vbucksAmount, amountCents),
+                );
+              }
+              await Promise.allSettled(notifs);
+            })
+            .catch((err) =>
+              console.error('[stripe webhook] post-credit email notification failed', err),
             ),
-          )
-          .catch((err) =>
-            console.error('[stripe webhook] admin email notification failed', err),
-          );
+        );
       }
     }
 
@@ -96,12 +116,14 @@ export async function POST(req: Request) {
         .filter(Boolean);
 
       if (adminEmails.length > 0) {
-        sendAccountFlaggedNotificationToAdmin(
-          adminEmails,
-          paymentIntentId,
-          `Stripe event: ${event.type}`,
-        ).catch((err) =>
-          console.error('[stripe webhook] chargeback email notification failed', err),
+        waitUntil(
+          sendAccountFlaggedNotificationToAdmin(
+            adminEmails,
+            paymentIntentId,
+            `Stripe event: ${event.type}`,
+          ).catch((err) =>
+            console.error('[stripe webhook] chargeback email notification failed', err),
+          ),
         );
       }
     }

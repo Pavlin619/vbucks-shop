@@ -196,6 +196,7 @@ export async function getPendingOrders(): Promise<{
 export async function fulfillOrder(
   orderId: string,
   action: 'gifted' | 'refunded',
+  registerBackground: (p: Promise<unknown>) => void = () => {},
 ): Promise<void> {
   const { data: order, error: fetchError } = await supabaseAdmin
     .from('skin_orders')
@@ -233,16 +234,20 @@ export async function fulfillOrder(
     const username = profile?.fortnite_username ?? order.user_id;
 
     if (action === 'gifted') {
-      sendOrderFulfilledNotificationToAdmin(adminEmails, username, order.skin_name).catch((err) =>
-        console.error('[services/orders] fulfillment email failed', err),
+      registerBackground(
+        sendOrderFulfilledNotificationToAdmin(adminEmails, username, order.skin_name).catch(
+          (err) => console.error('[services/orders] fulfillment email failed', err),
+        ),
       );
     } else {
-      sendOrderRefundedNotificationToAdmin(
-        adminEmails,
-        username,
-        order.skin_name,
-        order.vbucks_cost,
-      ).catch((err) => console.error('[services/orders] refund email failed', err));
+      registerBackground(
+        sendOrderRefundedNotificationToAdmin(
+          adminEmails,
+          username,
+          order.skin_name,
+          order.vbucks_cost,
+        ).catch((err) => console.error('[services/orders] refund email failed', err)),
+      );
     }
   }
 }
