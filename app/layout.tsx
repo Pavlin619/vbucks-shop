@@ -17,9 +17,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://localhost:3000';
+
 export const metadata: Metadata = {
-  title: "VBucks Shop",
-  description: "Buy V-Bucks and spend them on Fortnite skins",
+  title: {
+    // Individual pages set their own title; this is the fallback.
+    default: 'VBucks Shop',
+    // Pages that set `title: 'Item Shop'` will render as "Item Shop · VBucks Shop".
+    template: '%s · VBucks Shop',
+  },
+  description: 'Buy V-Bucks and spend them on Fortnite skins.',
+  metadataBase: new URL(APP_URL),
+  openGraph: {
+    siteName: 'VBucks Shop',
+    type: 'website',
+    locale: 'bg_BG',
+  },
+  twitter: {
+    card: 'summary',
+  },
+  robots: {
+    // Let the robots.ts file handle the per-route allow/disallow rules;
+    // this just ensures the global default is "index and follow".
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
