@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { CartProvider } from "@/contexts/CartContext";
@@ -22,13 +23,14 @@ export const metadata: Metadata = {
   description: "Buy V-Bucks and spend them on Fortnite skins",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get('x-nonce') ?? '';
   return (
-    <ClerkProvider>
+    <ClerkProvider nonce={nonce}>
       <html
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
