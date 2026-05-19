@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { AlertTriangle } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -12,9 +13,8 @@ interface ErrorPageProps {
 
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('Segment error boundary:', error);
-    }
+    // digest lets you match this Sentry event to the corresponding server-side log line
+    Sentry.captureException(error, { extra: { digest: error.digest } });
   }, [error]);
 
   return (
