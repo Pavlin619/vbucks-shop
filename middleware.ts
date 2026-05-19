@@ -58,8 +58,12 @@ function buildCsp(nonce: string): string {
       'https://api.clerk.com',
       'https://clerk-telemetry.com',
       'https://api.stripe.com',
+      'https://*.ingest.sentry.io',    // Sentry US region ingestion
+      'https://*.ingest.de.sentry.io', // Sentry EU/DE region ingestion (this project's DSN)
       isDev && 'ws://localhost:* wss://localhost:*', // Next.js HMR
     ]),
+    // Sentry Session Replay loads its recording worker from a blob: URL
+    "worker-src blob:",
     h([
       'frame-src',
       'https://*.clerk.accounts.dev', // Clerk sign-in / sign-up modal UI
