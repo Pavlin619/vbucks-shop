@@ -1,23 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
 
 const STORAGE_KEY = 'cookie-notice-dismissed';
 
-export default function CookieBanner() {
-  const [visible, setVisible] = useState(false);
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setVisible(true);
-    }
-  }, []);
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  return () => listeners.delete(onChange);
+}
+
+function getSnapshot() {
+  return !localStorage.getItem(STORAGE_KEY);
+}
+
+// Server (and during hydration) never has localStorage — don't show the banner
+// so the server HTML matches the initial client render.
+function getServerSnapshot() {
+  return false;
+}
+
+export default function CookieBanner() {
+  const visible = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   function dismiss() {
     localStorage.setItem(STORAGE_KEY, '1');
-    setVisible(false);
+    listeners.forEach(fn => fn());
   }
 
   if (!visible) return null;
