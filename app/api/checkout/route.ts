@@ -16,6 +16,9 @@ export async function POST(req: Request) {
   }
 
   const profile = await getProfile(userId);
+  if (!profile.phone_number) {
+    return NextResponse.json({ error: 'phone_required' }, { status: 422 });
+  }
   if (!profile.fortnite_username || profile.fortnite_username.trim() === '') {
     return NextResponse.json({ error: 'fortnite_username_required' }, { status: 422 });
   }

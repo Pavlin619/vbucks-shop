@@ -2,18 +2,18 @@ import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import type { Profile } from '@/types';
 
-export async function syncProfile(userId: string, phoneNumber?: string | null): Promise<void> {
+export async function syncProfile(userId: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from('profiles')
-    .upsert({ id: userId, phone_number: phoneNumber ?? null }, { onConflict: 'id', ignoreDuplicates: true });
+    .upsert({ id: userId }, { onConflict: 'id', ignoreDuplicates: true });
 
   if (error) throw new Error(error.message);
 }
 
-export async function updatePhoneNumber(userId: string, phoneNumber: string | null): Promise<void> {
+export async function savePhoneNumber(userId: string, phone: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from('profiles')
-    .update({ phone_number: phoneNumber })
+    .update({ phone_number: phone })
     .eq('id', userId);
 
   if (error) throw new Error(error.message);

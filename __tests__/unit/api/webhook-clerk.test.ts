@@ -6,7 +6,6 @@ vi.mock('@clerk/nextjs/webhooks', () => ({
 
 vi.mock('@/services/wallet', () => ({
   syncProfile: vi.fn(),
-  updatePhoneNumber: vi.fn(),
 }));
 
 import { type NextRequest } from 'next/server';
@@ -48,7 +47,7 @@ describe('POST /api/webhooks/clerk', () => {
 
     expect(res.status).toBe(200);
     expect(mockSyncProfile).toHaveBeenCalledOnce();
-    expect(mockSyncProfile).toHaveBeenCalledWith('user_abc123', null);
+    expect(mockSyncProfile).toHaveBeenCalledWith('user_abc123');
   });
 
   it('returns 500 when syncProfile throws', async () => {
@@ -79,6 +78,18 @@ describe('POST /api/webhooks/clerk', () => {
     mockVerifyWebhook.mockResolvedValue({
       type: 'session.created',
       data: { id: 'sess_xyz' },
+    } as never);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(mockSyncProfile).not.toHaveBeenCalled();
+  });
+
+  it('does not call syncProfile on user.updated events', async () => {
+    mockVerifyWebhook.mockResolvedValue({
+      type: 'user.updated',
+      data: { id: 'user_abc123' },
     } as never);
 
     const res = await POST(makeRequest());

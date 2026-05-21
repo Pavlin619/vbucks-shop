@@ -24,6 +24,7 @@ const isPublicRoute = createRouteMatcher([
 
 const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin/(.*)']);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
+const isOnboardingRoute = createRouteMatcher(['/onboarding']);
 
 function buildCsp(nonce: string): string {
   const h = (parts: (string | false)[]) => parts.filter(Boolean).join(' ');
@@ -111,6 +112,19 @@ export default clerkMiddleware(async (auth, req) => {
       return isApiRoute(req)
         ? NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         : NextResponse.redirect(new URL('/', req.url));
+    }
+
+    // Onboarding gate: page requests only (not API, not admin, not the
+    // onboarding page itself). Admins are exempt — they're operators, not
+    // customers, so the phone-collection step doesn't apply to them.
+    if (
+      !isApiRoute(req) &&
+      !isOnboardingRoute(req) &&
+      !isAdminRoute(req) &&
+      sessionClaims?.metadata?.role !== 'admin' &&
+      !sessionClaims?.metadata?.onboardingComplete
+    ) {
+      return NextResponse.redirect(new URL('/onboarding', req.url));
     }
   }
 

@@ -177,6 +177,19 @@ export default function PurchaseSteps({
         <p className="mt-1 text-sm text-brand-muted">
           Плати с карта и V-Bucks ще бъдат добавени веднага към баланса ти.
         </p>
+        {checkoutError?.kind === 'phone_required' && (
+          <Alert
+            variant="warning"
+            className="mt-2 text-xs"
+            action={
+              <Button as="link" href="/onboarding" size="sm" variant="secondary">
+                Добави
+              </Button>
+            }
+          >
+            Необходим е телефонен номер преди покупка.
+          </Alert>
+        )}
         {checkoutError?.kind === 'no_username' && (
           <Alert
             variant="warning"

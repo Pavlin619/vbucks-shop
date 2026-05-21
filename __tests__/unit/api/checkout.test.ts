@@ -45,7 +45,7 @@ const validItems = [{ packId: '1000', quantity: 1 }];
 const validProfile = {
   id: 'user_abc',
   fortnite_username: 'NinjaPlayer123',
-  phone_number: null,
+  phone_number: '+359881234567',
   vbucks_balance: 5000,
   friend_request_status: 'accepted' as const,
   friend_request_accepted_at: '2026-04-17T00:00:00Z',
@@ -70,6 +70,18 @@ describe('POST /api/checkout', () => {
 
     await expect(POST(makeRequest({ items: validItems }))).rejects.toThrow();
     expect(mockAuthProtect).toHaveBeenCalled();
+    expect(mockSessionCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 with phone_required when the user has no phone number', async () => {
+    mockAuthProtect.mockResolvedValue({ userId: 'user_abc' } as never);
+    mockGetProfile.mockResolvedValue({ ...validProfile, phone_number: null });
+
+    const res = await POST(makeRequest({ items: validItems }));
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'phone_required' });
     expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
