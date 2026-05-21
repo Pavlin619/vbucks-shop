@@ -6,6 +6,7 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import type { CartItem } from '@/contexts/CartContext';
 
 export type CheckoutError =
+  | { kind: 'phone_required'; message: string }
   | { kind: 'no_username'; message: string }
   | { kind: 'invalid_cart'; message: string }
   | { kind: 'transient'; message: string };
@@ -17,6 +18,9 @@ interface UseCheckoutResult {
 }
 
 function mapApiError(err: ApiError): CheckoutError {
+  if (err.status === 422 && err.body.error === 'phone_required') {
+    return { kind: 'phone_required', message: err.message };
+  }
   if (err.status === 422) return { kind: 'no_username', message: err.message };
   if (err.status === 400) return { kind: 'invalid_cart', message: err.message };
   return { kind: 'transient', message: err.message };
