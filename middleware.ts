@@ -40,6 +40,7 @@ function buildCsp(nonce: string): string {
       isDev && "'unsafe-eval'", // React reconstructs call stacks with eval() in dev
       'https://*.clerk.accounts.dev',
       'https://js.clerk.com',
+      'https://clerk.promociika.com', // custom Clerk domain
       'https://js.stripe.com',
       // Clerk bot-protection widget (Cloudflare Turnstile)
       'https://challenges.cloudflare.com',
@@ -57,6 +58,7 @@ function buildCsp(nonce: string): string {
       "connect-src 'self'",
       'https://*.clerk.accounts.dev',
       'https://api.clerk.com',
+      'https://clerk.promociika.com', // custom Clerk domain
       'https://clerk-telemetry.com',
       'https://api.stripe.com',
       'https://*.ingest.sentry.io',    // Sentry US region ingestion
@@ -69,6 +71,7 @@ function buildCsp(nonce: string): string {
       'frame-src',
       'https://*.clerk.accounts.dev', // Clerk sign-in / sign-up modal UI
       'https://accounts.clerk.com',
+      'https://clerk.promociika.com', // custom Clerk domain
       'https://js.stripe.com',        // Stripe Payment Element
       'https://hooks.stripe.com',     // Stripe 3DS redirect frames
       'https://challenges.cloudflare.com', // Clerk bot-protection widget
