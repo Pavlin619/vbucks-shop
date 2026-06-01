@@ -4,7 +4,8 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
-  title: 'Условия за Ползване | VBucks Shop',
+  title: 'Условия за Ползване',
+  description: 'Общи условия за ползване на Promociika — права и задължения при поръчка на V-Bucks и Fortnite скинове.',
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

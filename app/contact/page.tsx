@@ -6,7 +6,8 @@ import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
 
 export const metadata: Metadata = {
-  title: 'Контакт | VBucks Shop',
+  title: 'Контакт',
+  description: 'Свържи се с нас по имейл или телефон. Отговаряме в рамките на 2 работни дни.',
 };
 
 export default function ContactPage() {

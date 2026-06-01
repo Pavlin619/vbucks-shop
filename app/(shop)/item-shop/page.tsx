@@ -10,8 +10,12 @@ import { fetchShopEntries, groupByLayout } from '@/services/skins';
 import { canAccessItemShop } from '@/services/access-gate';
 
 export const metadata = {
-  title: 'Item Shop · VBucks Shop',
+  title: 'Item Shop',
   description: 'Днешният Fortnite Item Shop — скинове, бъндъли и аксесоари с реални V-Bucks цени.',
+  openGraph: {
+    title: 'Fortnite Item Shop | Promociika',
+    description: 'Днешният Fortnite Item Shop — скинове, бъндъли и аксесоари с реални V-Bucks цени.',
+  },
 };
 
 export default async function ItemShopPage() {
