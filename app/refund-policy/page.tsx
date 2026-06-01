@@ -4,7 +4,8 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
-  title: 'Политика за Възстановяване | VBucks Shop',
+  title: 'Политика за Възстановяване',
+  description: 'Условия за анулиране на поръчки и възстановяване на средства за V-Bucks и Fortnite скинове.',
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

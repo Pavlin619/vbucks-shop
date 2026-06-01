@@ -19,8 +19,51 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VBucks Shop",
-  description: "Buy V-Bucks and spend them on Fortnite skins",
+  metadataBase: new URL('https://promociika.com'),
+  title: {
+    default: 'Promociika — Fortnite V-Bucks & Skins',
+    template: '%s | Promociika',
+  },
+  description:
+    'Купи V-Bucks с реални пари и ги похарчи за Fortnite скинове. Бърза доставка, сигурно плащане.',
+  keywords: ['V-Bucks', 'Fortnite', 'скинове', 'Fortnite shop', 'Promociika', 'VBucks Shop'],
+  openGraph: {
+    type: 'website',
+    locale: 'bg_BG',
+    url: 'https://promociika.com',
+    siteName: 'Promociika',
+    title: 'Promociika — Fortnite V-Bucks & Skins',
+    description:
+      'Купи V-Bucks с реални пари и ги похарчи за Fortnite скинове. Бърза доставка, сигурно плащане.',
+    images: [
+      {
+        url: '/vbucks-coin.jpg',
+        alt: 'Promociika — Fortnite V-Bucks Shop',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Promociika — Fortnite V-Bucks & Skins',
+    description:
+      'Купи V-Bucks с реални пари и ги похарчи за Fortnite скинове. Бърза доставка, сигурно плащане.',
+    images: ['/vbucks-coin.jpg'],
+  },
+  icons: {
+    icon: '/vbucks-coin.jpg',
+    apple: '/vbucks-coin.jpg',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 export default async function RootLayout({

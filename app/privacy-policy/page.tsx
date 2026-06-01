@@ -4,7 +4,8 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
-  title: 'Политика за Поверителност | VBucks Shop',
+  title: 'Политика за Поверителност',
+  description: 'Научи как Promociika събира, използва и защитава твоите лични данни.',
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
