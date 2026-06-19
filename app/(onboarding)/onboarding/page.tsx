@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { getProfile } from '@/services/wallet';
+import { syncProfile, getProfile } from '@/services/wallet';
 import Card from '@/components/ui/Card';
 import PhoneNumberForm from '@/app/(onboarding)/onboarding/_components/PhoneNumberForm';
 
@@ -15,6 +15,8 @@ export default async function OnboardingPage() {
     redirect('/profile');
   }
 
+  // Idempotent upsert — creates the row if the user.created webhook hasn't fired yet
+  await syncProfile(userId);
   const profile = await getProfile(userId);
 
   return (
