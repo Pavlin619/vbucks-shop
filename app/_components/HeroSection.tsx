@@ -1,31 +1,28 @@
+import Image from 'next/image';
+
 /**
- * Top hero block on the home page. The radial + linear gradient
- * decoration is an inline `style` (justified — it's a layered multi-stop
- * gradient that's awkward to express as a Tailwind utility), but the
- * brand colors are referenced through CSS variables so the @theme palette
- * remains the single source of truth.
- *
- * To use real artwork instead of the gradient: drop your image into
- * `public/images/hero-bg.jpg` and replace the first decorative div with
- * `<Image src="/images/hero-bg.jpg" fill className="object-cover" alt="" />`.
+ * Top hero block on the home page. A full-bleed banner image sits behind a
+ * layered linear gradient overlay (inline `style` is justified — it's a
+ * multi-stop gradient that's awkward as a Tailwind utility) that fades the
+ * artwork into the page background. The overlay colors mirror the Figma
+ * design's brand-dark stops.
  */
 export default function HeroSection() {
   return (
     <section className="relative h-screen flex items-center justify-center overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{
-          // `#1a0a2e` is an aesthetic mid-stop unique to this gradient and
-          // intentionally not promoted to a brand token.
-          background:
-            'radial-gradient(ellipse at 50% 65%, var(--color-brand-purple) 0%, #1a0a2e 40%, var(--color-brand-dark) 100%)',
-        }}
+      <Image
+        src="/images/hero-bg.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover"
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(to bottom, rgba(1,22,39,0.2), rgba(1,22,39,0.4), rgba(1,22,39,0.95))',
+            'linear-gradient(to bottom, rgba(1,22,39,0.3), rgba(1,22,39,0.5), rgba(1,22,39,1))',
         }}
       />
 
